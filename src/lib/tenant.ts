@@ -10,6 +10,17 @@ const RESERVED_PATH_SEGMENTS = new Set([
   "favicon.ico",
   "assets",
   "static",
+  "login",
+  "dashboard",
+  "organizations",
+  "subscriptions",
+  "invoices",
+  "plans",
+  "analytics",
+  "activity",
+  "support",
+  "features",
+  "settings",
 ]);
 
 function normalizeHost(host?: string | null) {

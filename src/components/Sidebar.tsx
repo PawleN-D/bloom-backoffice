@@ -15,11 +15,15 @@ const navItems = [
   { href: "/settings", label: "Settings" },
 ];
 
-export default function Sidebar() {
+type SidebarProps = {
+  onNavigate?: () => void;
+};
+
+export default function Sidebar({ onNavigate }: SidebarProps) {
   const pathname = usePathname();
 
   return (
-    <aside className="h-full w-full border-r border-white/10 bg-slate-950/60 px-6 py-8">
+    <aside className="h-full w-full border-r border-white/10 bg-slate-950/60 px-6 py-8 overflow-y-auto">
       <div className="mb-10">
         <div className="text-xs uppercase tracking-[0.3em] text-slate-400">
           Internal
@@ -36,6 +40,7 @@ export default function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               className={`flex items-center justify-between rounded-xl px-4 py-3 text-sm transition ${
                 isActive
                   ? "bg-slate-900 text-white shadow-glow"

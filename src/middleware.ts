@@ -15,6 +15,7 @@ export function middleware(request: NextRequest) {
   const host = request.headers.get("host") ?? request.nextUrl.host;
   const tenant = resolveTenant({ host, pathname });
   const pagesDev = isPagesDevHost(host);
+  const tenantCookie = request.cookies.get("bloom_tenant")?.value;
 
   let normalizedPathname = pathname;
   let shouldRewrite = false;
@@ -24,6 +25,18 @@ export function middleware(request: NextRequest) {
       normalizedPathname = stripped;
       shouldRewrite = true;
     }
+  }
+
+  if (
+    !tenant &&
+    pagesDev &&
+    tenantCookie &&
+    !PUBLIC_PATHS.has(normalizedPathname) &&
+    !normalizedPathname.startsWith("/api")
+  ) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = `/${tenantCookie}${pathname}`;
+    return NextResponse.redirect(redirectUrl);
   }
 
   const requestHeaders = new Headers(request.headers);
@@ -36,10 +49,24 @@ export function middleware(request: NextRequest) {
     nextUrl.pathname = normalizedPathname;
   }
 
+  const attachTenantCookie = (response: NextResponse) => {
+    if (tenant) {
+      response.cookies.set("bloom_tenant", tenant, {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 30,
+      });
+    }
+    return response;
+  };
+
   const forward = () =>
-    shouldRewrite
-      ? NextResponse.rewrite(nextUrl, { request: { headers: requestHeaders } })
-      : NextResponse.next({ request: { headers: requestHeaders } });
+    attachTenantCookie(
+      shouldRewrite
+        ? NextResponse.rewrite(nextUrl, { request: { headers: requestHeaders } })
+        : NextResponse.next({ request: { headers: requestHeaders } })
+    );
 
   if (!tenant) {
     return forward();
