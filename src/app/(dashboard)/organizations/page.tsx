@@ -22,6 +22,7 @@ import StatusBadge from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { organizationSummaries } from "@/data/mock";
 import { fetchOrganizations } from "@/lib/api/organizations";
+import { ORG_DOMAIN } from "@/lib/config";
 import type { OrganizationSummary } from "@/types";
 
 const planOptions = [
@@ -137,7 +138,8 @@ export default function OrganizationsPage() {
         !term ||
         row.name.toLowerCase().includes(term) ||
         row.slug.toLowerCase().includes(term) ||
-        row.billingEmail.toLowerCase().includes(term);
+        row.billingEmail.toLowerCase().includes(term) ||
+        row.subdomain?.toLowerCase().includes(term);
 
       const matchesPlan = planFilter === "ALL" || row.plan === planFilter;
       const matchesStatus = statusFilter === "ALL" || row.status === statusFilter;
@@ -193,6 +195,11 @@ export default function OrganizationsPage() {
           <div>
             <div className="text-sm font-medium text-white">{row.original.name}</div>
             <div className="text-xs text-slate-500">{row.original.slug}</div>
+            <div className="text-xs text-slate-600">
+              {row.original.subdomain
+                ? `${row.original.subdomain}.${ORG_DOMAIN}`
+                : "—"}
+            </div>
           </div>
         ),
       },
@@ -294,6 +301,7 @@ export default function OrganizationsPage() {
   const handleExportCsv = () => {
     const headers = [
       "Organization",
+      "Subdomain",
       "Plan",
       "Status",
       "Users",
@@ -304,6 +312,7 @@ export default function OrganizationsPage() {
     ];
     const lines = filteredRows.map((row) => [
       row.name,
+      row.subdomain ? `${row.subdomain}.${ORG_DOMAIN}` : "",
       row.plan,
       row.status,
       `${row.usersUsed}/${row.usersLimit}`,

@@ -21,15 +21,24 @@ export async function POST(request: Request) {
   });
 
   if (!response.ok) {
-    const message = await response.text();
-    return NextResponse.json(
-      { message: message || "Invalid credentials." },
-      { status: response.status }
-    );
+    let message = "Invalid credentials.";
+    try {
+      const errorPayload = (await response.json()) as { error?: string; message?: string };
+      message = errorPayload.error ?? errorPayload.message ?? message;
+    } catch {
+      const text = await response.text();
+      if (text) message = text;
+    }
+    return NextResponse.json({ message }, { status: response.status });
   }
 
-  const data = (await response.json()) as AuthResponse;
-  cookies().set(AUTH_COOKIE_NAME, data.token, getAuthCookieOptions());
+  const payload = (await response.json()) as { data?: AuthResponse } | AuthResponse;
+  const auth = (payload as { data?: AuthResponse }).data ?? (payload as AuthResponse);
+  if (!auth?.token || !auth?.user) {
+    return NextResponse.json({ message: "Invalid login response." }, { status: 502 });
+  }
 
-  return NextResponse.json(buildAuthResponse(data.user));
+  cookies().set(AUTH_COOKIE_NAME, auth.token, getAuthCookieOptions());
+
+  return NextResponse.json(buildAuthResponse(auth.user));
 }

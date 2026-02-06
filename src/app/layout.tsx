@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Space_Grotesk, IBM_Plex_Mono } from "next/font/google";
 import Providers from "@/components/Providers";
+import { APP_ENV } from "@/lib/config";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -26,7 +27,11 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en" className={`${spaceGrotesk.variable} ${plexMono.variable}`}>
+    <html
+      lang="en"
+      className={`${spaceGrotesk.variable} ${plexMono.variable}`}
+      data-app-env={APP_ENV}
+    >
       <body className="font-sans">
         <Providers>{children}</Providers>
       </body>

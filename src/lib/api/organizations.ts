@@ -79,7 +79,10 @@ function normalizeSlug(value: unknown, fallbackName: string): string {
 
 export function toOrganizationSummary(raw: Record<string, unknown>): OrganizationSummary {
   const name = String(raw.name ?? raw.organizationName ?? raw.title ?? "Unknown Organization");
-  const slug = normalizeSlug(raw.slug ?? raw.subdomain, name);
+  const slug = normalizeSlug(raw.slug ?? raw.subdomain ?? raw.subDomain, name);
+  const rawSubdomain = raw.subdomain ?? raw.subDomain ?? null;
+  const subdomain =
+    typeof rawSubdomain === "string" && rawSubdomain.trim() ? rawSubdomain.trim() : null;
   const billingEmail = String(raw.billingEmail ?? raw.billing_email ?? raw.email ?? "");
 
   const count = (raw as { _count?: Record<string, number> })._count ?? {};
@@ -110,6 +113,7 @@ export function toOrganizationSummary(raw: Record<string, unknown>): Organizatio
     id: String(raw.id ?? raw._id ?? slug),
     name,
     slug,
+    subdomain,
     billingEmail,
     plan: normalizePlan(raw.plan ?? raw.subscriptionPlan ?? raw.tier ?? "STARTER"),
     status: normalizeStatus(

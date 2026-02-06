@@ -20,7 +20,7 @@ export type BackOfficeUser = {
   email: string;
   firstName: string;
   lastName: string;
-  role: "ADMIN" | "SUPPORT" | "BILLING" | "VIEWER";
+  role: "ADMIN" | "SUPPORT" | "BILLING" | "VIEWER" | "SUPER_ADMIN" | "MANAGER" | "ORG_OWNER" | "WORKER";
 };
 
 export type AuthResponse = {
@@ -44,6 +44,7 @@ export type OrganizationSummary = {
   id: string;
   name: string;
   slug: string;
+  subdomain: string | null;
   billingEmail: string;
   plan: OrganizationPlan;
   status: OrganizationStatus;

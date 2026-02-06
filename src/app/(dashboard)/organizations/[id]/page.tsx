@@ -17,6 +17,7 @@ import {
   fetchOrganizationTickets,
   fetchOrganizationUsers,
 } from "@/lib/api/organizations";
+import { ORG_DOMAIN } from "@/lib/config";
 import type {
   OrganizationActivity,
   OrganizationSummary,
@@ -182,8 +183,9 @@ export default function OrganizationDetailPage() {
   };
 
   const subdomain = useMemo(() => {
-    if (!organization?.slug) return "—";
-    return `${organization.slug}.bloom.ie`;
+    const value = organization?.subdomain;
+    if (!value) return "—";
+    return `${value}.${ORG_DOMAIN}`;
   }, [organization]);
 
   const handleSuspendToggle = () => {
