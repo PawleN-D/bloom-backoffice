@@ -2,7 +2,6 @@
 
 export const runtime = "edge";
 
-
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -180,10 +179,9 @@ export default function OrganizationDetailPage() {
       .finally(() => setIsLoading(false));
   };
 
-
-  const subdomain = useMemo(() => organization-.subdomain -- null, [organization]);
+  const subdomain = useMemo(() => organization?.subdomain ?? null, [organization]);
   const organizationUrl = useMemo(
-    () => (subdomain - getOrganizationUrl(subdomain) : null),
+    () => (subdomain ? getOrganizationUrl(subdomain) : null),
     [subdomain]
   );
 
@@ -191,7 +189,7 @@ export default function OrganizationDetailPage() {
     if (!organization) return;
     setOrganization({
       ...organization,
-      status: organization.status === "SUSPENDED" - "ACTIVE" : "SUSPENDED",
+      status: organization.status === "SUSPENDED" ? "ACTIVE" : "SUSPENDED",
     });
   };
 
@@ -207,7 +205,7 @@ export default function OrganizationDetailPage() {
     return (
       <Card className="space-y-4">
         <p className="text-sm text-slate-300">Organization not found.</p>
-        {error - (
+        {error ? (
           <div className="rounded-lg border border-danger-500/40 bg-danger-500/10 px-4 py-3 text-sm text-danger-500">
             {error}
             <div className="mt-3 flex flex-wrap gap-2">
@@ -229,10 +227,10 @@ export default function OrganizationDetailPage() {
   }
 
   const usersPercent = organization.usersLimit
-    - Math.min(100, Math.round((organization.usersUsed / organization.usersLimit) * 100))
+    ? Math.min(100, Math.round((organization.usersUsed / organization.usersLimit) * 100))
     : 0;
   const clientsPercent = organization.clientsLimit
-    - Math.min(100, Math.round((organization.clientsUsed / organization.clientsLimit) * 100))
+    ? Math.min(100, Math.round((organization.clientsUsed / organization.clientsLimit) * 100))
     : 0;
 
   return (
@@ -266,7 +264,7 @@ export default function OrganizationDetailPage() {
             onClick={() => setActiveTab(tab)}
             className={`rounded-full px-4 py-2 text-xs uppercase tracking-[0.3em] transition ${
               activeTab === tab
-                - "bg-accent-500/20 text-accent-300"
+                ? "bg-accent-500/20 text-accent-300"
                 : "bg-slate-900/60 text-slate-400 hover:text-slate-200"
             }`}
           >
@@ -275,18 +273,20 @@ export default function OrganizationDetailPage() {
         ))}
       </div>
 
-      {activeTab === "Overview" - (
+      {activeTab === "Overview" ? (
         <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
           <Card className="space-y-6">
             <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Organization Details</p>
+              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
+                Organization Details
+              </p>
               <div className="mt-4 grid gap-3 text-sm text-slate-200">
                 <div>Name: {organization.name}</div>
                 <div>Slug: {organization.slug}</div>
-                <div>Subdomain: {subdomain -- "-"}</div>
+                <div>Subdomain: {subdomain ?? "-"}</div>
                 <div>
                   Organization URL:{" "}
-                  {organizationUrl - (
+                  {organizationUrl ? (
                     <span className="inline-flex flex-wrap items-center gap-2">
                       <a
                         href={organizationUrl}
@@ -329,13 +329,19 @@ export default function OrganizationDetailPage() {
                 <div>
                   Users: {organization.usersUsed}/{organization.usersLimit}
                   <div className="mt-2 h-2 w-full rounded-full bg-slate-800">
-                    <div className="h-2 rounded-full bg-accent-500" style={{ width: `${usersPercent}%` }} />
+                    <div
+                      className="h-2 rounded-full bg-accent-500"
+                      style={{ width: `${usersPercent}%` }}
+                    />
                   </div>
                 </div>
                 <div>
                   Clients: {organization.clientsUsed}/{organization.clientsLimit}
                   <div className="mt-2 h-2 w-full rounded-full bg-slate-800">
-                    <div className="h-2 rounded-full bg-accent-500" style={{ width: `${clientsPercent}%` }} />
+                    <div
+                      className="h-2 rounded-full bg-accent-500"
+                      style={{ width: `${clientsPercent}%` }}
+                    />
                   </div>
                 </div>
               </div>
@@ -351,13 +357,13 @@ export default function OrganizationDetailPage() {
         </div>
       ) : null}
 
-      {activeTab === "Subscription" - (
+      {activeTab === "Subscription" ? (
         <Card className="space-y-4">
-          {tabState.Subscription.loading - (
+          {tabState.Subscription.loading ? (
             <p className="text-sm text-slate-300">Loading subscription...</p>
-          ) : tabState.Subscription.error - (
+          ) : tabState.Subscription.error ? (
             <p className="text-sm text-danger-500">{tabState.Subscription.error}</p>
-          ) : subscription - (
+          ) : subscription ? (
             <div className="grid gap-3 text-sm text-slate-300">
               <div>Plan: {subscription.plan}</div>
               <div>Billing Cycle: {subscription.billingCycle}</div>
@@ -373,13 +379,13 @@ export default function OrganizationDetailPage() {
         </Card>
       ) : null}
 
-      {activeTab === "Users" - (
+      {activeTab === "Users" ? (
         <Card className="space-y-4">
-          {tabState.Users.loading - (
+          {tabState.Users.loading ? (
             <p className="text-sm text-slate-300">Loading users...</p>
-          ) : tabState.Users.error - (
+          ) : tabState.Users.error ? (
             <p className="text-sm text-danger-500">{tabState.Users.error}</p>
-          ) : users.length - (
+          ) : users.length ? (
             <div className="overflow-hidden rounded-lg border border-white/10">
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-900/70 text-xs uppercase tracking-[0.3em] text-slate-500">
@@ -398,7 +404,9 @@ export default function OrganizationDetailPage() {
                       <td className="px-4 py-3 text-slate-300">{user.email}</td>
                       <td className="px-4 py-3 text-slate-300">{user.role}</td>
                       <td className="px-4 py-3 text-slate-300">{user.status}</td>
-                      <td className="px-4 py-3 text-slate-400">{formatRelative(user.lastLoginAt)}</td>
+                      <td className="px-4 py-3 text-slate-400">
+                        {formatRelative(user.lastLoginAt)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -410,16 +418,19 @@ export default function OrganizationDetailPage() {
         </Card>
       ) : null}
 
-      {activeTab === "Activity" - (
+      {activeTab === "Activity" ? (
         <Card className="space-y-4">
-          {tabState.Activity.loading - (
+          {tabState.Activity.loading ? (
             <p className="text-sm text-slate-300">Loading activity...</p>
-          ) : tabState.Activity.error - (
+          ) : tabState.Activity.error ? (
             <p className="text-sm text-danger-500">{tabState.Activity.error}</p>
-          ) : activity.length - (
+          ) : activity.length ? (
             <div className="space-y-3">
               {activity.map((item) => (
-                <div key={item.id} className="rounded-lg border border-white/10 bg-slate-900/60 px-4 py-3">
+                <div
+                  key={item.id}
+                  className="rounded-lg border border-white/10 bg-slate-900/60 px-4 py-3"
+                >
                   <div className="text-sm text-slate-200">{item.message}</div>
                   <div className="mt-1 text-xs text-slate-500">
                     {item.actor} - {formatRelative(item.timestamp)}
@@ -433,19 +444,23 @@ export default function OrganizationDetailPage() {
         </Card>
       ) : null}
 
-      {activeTab === "Support" - (
+      {activeTab === "Support" ? (
         <Card className="space-y-4">
-          {tabState.Support.loading - (
+          {tabState.Support.loading ? (
             <p className="text-sm text-slate-300">Loading tickets...</p>
-          ) : tabState.Support.error - (
+          ) : tabState.Support.error ? (
             <p className="text-sm text-danger-500">{tabState.Support.error}</p>
-          ) : tickets.length - (
+          ) : tickets.length ? (
             <div className="space-y-3">
               {tickets.map((ticket) => (
-                <div key={ticket.id} className="rounded-lg border border-white/10 bg-slate-900/60 px-4 py-3">
+                <div
+                  key={ticket.id}
+                  className="rounded-lg border border-white/10 bg-slate-900/60 px-4 py-3"
+                >
                   <div className="text-sm text-slate-200">{ticket.subject}</div>
                   <div className="mt-1 text-xs text-slate-500">
-                    Status: {ticket.status} - Priority: {ticket.priority} - {formatRelative(ticket.createdAt)}
+                    Status: {ticket.status} - Priority: {ticket.priority} -{" "}
+                    {formatRelative(ticket.createdAt)}
                   </div>
                   <div className="mt-1 text-xs text-slate-500">Assigned: {ticket.assignee}</div>
                 </div>
