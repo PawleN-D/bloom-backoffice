@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { AUTH_COOKIE_NAME } from "@/lib/authCookies";
 import { SERVER_API_BASE_URL } from "@/lib/config";
+import { resolveTenantFromRequest } from "@/lib/tenant";
 
 export const runtime = "edge";
 
@@ -29,6 +30,10 @@ async function proxyRequest(request: NextRequest, pathSegments: string[]) {
   headers.delete("content-length");
   headers.delete("accept-encoding");
   headers.set("authorization", `Bearer ${token}`);
+  const tenant = resolveTenantFromRequest(request);
+  if (tenant) {
+    headers.set("x-tenant", tenant);
+  }
 
   const hasBody = request.method !== "GET" && request.method !== "HEAD";
   const body = hasBody ? await request.arrayBuffer() : undefined;

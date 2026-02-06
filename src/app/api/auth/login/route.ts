@@ -2,6 +2,7 @@
 import { cookies } from "next/headers";
 import { buildAuthResponse, getAuthCookieOptions, AUTH_COOKIE_NAME } from "@/lib/authCookies";
 import { SERVER_API_BASE_URL } from "@/lib/config";
+import { resolveTenantFromRequest } from "@/lib/tenant";
 import type { AuthResponse } from "@/types";
 
 export const runtime = "edge";
@@ -15,9 +16,13 @@ export async function POST(request: Request) {
   }
 
   const requestPayload = await request.json();
+  const tenant = resolveTenantFromRequest(request);
   const response = await fetch(`${SERVER_API_BASE_URL}/api/auth/login`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(tenant ? { "x-tenant": tenant } : {}),
+    },
     body: JSON.stringify(requestPayload),
     cache: "no-store",
   });
