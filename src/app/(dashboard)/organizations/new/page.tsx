@@ -11,7 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { createOrganization } from "@/lib/api/onboarding";
+import { checkSubdomainAvailability } from "@/lib/api/organizations";
 import { onboardingSchema, type OnboardingFormValues } from "@/lib/schemas/validation";
+import {
+  generateSubdomain,
+  getOrganizationUrl,
+  isValidSubdomain,
+} from "@/lib/utils/subdomain";
+import { ORG_DOMAIN } from "@/lib/config";
 
 const steps = [
   "Organization",
@@ -22,7 +29,7 @@ const steps = [
 ] as const;
 
 const stepFields: Record<number, Array<keyof OnboardingFormValues>> = {
-  0: ["organizationName", "slug", "billingEmail"],
+  0: ["organizationName", "slug", "subdomain", "billingEmail"],
   1: ["plan", "billingCycle"],
   2: ["ownerFirstName", "ownerLastName", "ownerEmail", "temporaryPassword"],
   3: [],
@@ -51,13 +58,22 @@ function generatePassword() {
 export default function OnboardOrganizationPage() {
   const [currentStep, setCurrentStep] = useState(0);
   const [slugTouched, setSlugTouched] = useState(false);
+  const [customSubdomain, setCustomSubdomain] = useState(false);
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
+  const [subdomainAvailable, setSubdomainAvailable] = useState<boolean | null>(null);
+  const [availabilityMessage, setAvailabilityMessage] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [successData, setSuccessData] = useState<{
     organizationId?: string;
+    organizationName?: string;
+    subdomain?: string | null;
+    organizationUrl?: string;
     loginUrl?: string;
     invitationToken?: string;
     ownerEmail?: string;
+    temporaryPassword?: string;
   } | null>(null);
 
   const form = useForm<OnboardingFormValues>({
@@ -81,13 +97,56 @@ export default function OnboardOrganizationPage() {
 
   const { register, setValue, getValues, formState, trigger } = form;
   const watchedName = useWatch({ control: form.control, name: "organizationName" });
+  const watchedSubdomain = useWatch({ control: form.control, name: "subdomain" });
   const watchedFeatures = useWatch({ control: form.control, name: "features" });
+
+  const organizationNameField = register("organizationName");
+  const slugField = register("slug");
+  const subdomainField = register("subdomain");
 
   useEffect(() => {
     if (!slugTouched && watchedName) {
       setValue("slug", slugify(watchedName), { shouldValidate: true });
     }
-  }, [slugTouched, watchedName, setValue]);
+    if (!customSubdomain && watchedName) {
+      setValue("subdomain", generateSubdomain(watchedName), { shouldValidate: true });
+    }
+    if (!watchedName && !customSubdomain) {
+      setValue("subdomain", "", { shouldValidate: true });
+    }
+  }, [slugTouched, watchedName, customSubdomain, setValue]);
+
+  useEffect(() => {
+    const value = watchedSubdomain?.trim().toLowerCase() ?? "";
+    if (!value) {
+      setSubdomainAvailable(null);
+      setAvailabilityMessage(null);
+      return;
+    }
+    if (!isValidSubdomain(value)) {
+      setSubdomainAvailable(false);
+      setAvailabilityMessage("Subdomain is invalid or reserved.");
+      return;
+    }
+
+    const handle = setTimeout(async () => {
+      setCheckingAvailability(true);
+      try {
+        const result = await checkSubdomainAvailability(value);
+        setSubdomainAvailable(result.available);
+        setAvailabilityMessage(
+          result.available ? "Subdomain is available." : result.reason ?? "Subdomain is taken."
+        );
+      } catch {
+        setSubdomainAvailable(null);
+        setAvailabilityMessage("Unable to verify subdomain availability.");
+      } finally {
+        setCheckingAvailability(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(handle);
+  }, [watchedSubdomain]);
 
   const handleNext = async () => {
     const fields = stepFields[currentStep] ?? [];
@@ -116,11 +175,22 @@ export default function OnboardOrganizationPage() {
     setIsSubmitting(true);
     try {
       const result = await createOrganization(values);
+      const resolvedSubdomain = result.subdomain ?? values.subdomain ?? "";
+      const organizationUrl = resolvedSubdomain
+        ? getOrganizationUrl(resolvedSubdomain)
+        : undefined;
+      const loginUrl =
+        result.loginUrl ??
+        (organizationUrl ? `${organizationUrl}/login` : "https://admin.bloom.com/login");
       setSuccessData({
         organizationId: result.organizationId,
-        loginUrl: result.loginUrl ?? "https://admin.bloom.ie/login",
+        organizationName: result.organizationName ?? values.organizationName,
+        subdomain: resolvedSubdomain || null,
+        organizationUrl,
+        loginUrl,
         invitationToken: result.invitationToken,
         ownerEmail: result.ownerEmail ?? values.ownerEmail,
+        temporaryPassword: values.temporaryPassword,
       });
     } catch (error) {
       setSubmitError("Unable to create organization. Please try again.");
@@ -130,46 +200,92 @@ export default function OnboardOrganizationPage() {
   });
 
   const review = useMemo(() => getValues(), [currentStep, getValues]);
+  const disableNext =
+    currentStep === 0 && (checkingAvailability || subdomainAvailable !== true);
 
   if (successData) {
+    const organizationUrl = successData.organizationUrl;
+    const loginUrl = successData.loginUrl;
+    const credentialsText = [
+      loginUrl ? `Login URL: ${loginUrl}` : null,
+      successData.ownerEmail ? `Email: ${successData.ownerEmail}` : null,
+      successData.temporaryPassword
+        ? `Password: ${successData.temporaryPassword}`
+        : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
     return (
       <div className="space-y-6">
         <div>
-          <h2 className="text-3xl font-semibold text-white">Organization Created</h2>
+          <h2 className="text-3xl font-semibold text-white">Organization Created Successfully</h2>
           <p className="mt-2 text-sm text-slate-400">
-            Share the invite token below with the organization owner to complete setup.
+            Share the login credentials and invitation token with the organization owner.
           </p>
         </div>
+        {organizationUrl ? (
+          <Card className="space-y-4 border border-primary/30 bg-primary/10">
+            <div className="text-xs uppercase tracking-[0.3em] text-primary-light">
+              Organization URL
+            </div>
+            <div className="text-xl font-mono text-primary-light">
+              {organizationUrl}
+            </div>
+          </Card>
+        ) : null}
+
         <Card className="space-y-4">
-          <div className="text-sm text-slate-300">Login URL: {successData.loginUrl}</div>
-          <div className="text-sm text-slate-300">Owner Email: {successData.ownerEmail}</div>
-          <div className="text-sm text-slate-300">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-xs uppercase tracking-[0.3em] text-slate-500">
+              Login Credentials
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                if (!credentialsText) return;
+                void navigator.clipboard.writeText(credentialsText);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+            >
+              {copied ? "Copied!" : "Copy"}
+            </Button>
+          </div>
+          <div className="space-y-2 font-mono text-sm text-slate-300">
+            <div>Login URL: {loginUrl ?? "—"}</div>
+            <div>Email: {successData.ownerEmail ?? "—"}</div>
+            <div>Password: {successData.temporaryPassword ?? "—"}</div>
+          </div>
+          <div className="text-xs text-slate-500">
             Invitation Token: {successData.invitationToken ?? "—"}
           </div>
-          <div className="flex flex-wrap gap-3">
+        </Card>
+
+        <div className="flex flex-wrap gap-3">
+          {organizationUrl ? (
             <Button
               type="button"
               onClick={() => {
-                void navigator.clipboard.writeText(
-                  `Login URL: ${successData.loginUrl}\nEmail: ${successData.ownerEmail}\nInvitation Token: ${successData.invitationToken ?? ""}`
-                );
+                window.open(organizationUrl, "_blank", "noopener,noreferrer");
               }}
             >
-              Copy Credentials
+              Open Organization →
             </Button>
-            {successData.organizationId ? (
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => {
-                  window.location.href = `/organizations/${successData.organizationId}`;
-                }}
-              >
-                View Organization
-              </Button>
-            ) : null}
-          </div>
-        </Card>
+          ) : null}
+          {successData.organizationId ? (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                window.location.href = `/organizations/${successData.organizationId}`;
+              }}
+            >
+              View Organization Details
+            </Button>
+          ) : null}
+        </div>
       </div>
     );
   }
@@ -193,7 +309,7 @@ export default function OnboardOrganizationPage() {
                 <div className="space-y-2">
                   <Label>Organization Name *</Label>
                   <Input
-                    {...register("organizationName")}
+                    {...organizationNameField}
                     placeholder="CareWell Dublin"
                   />
                   {formState.errors.organizationName ? (
@@ -205,10 +321,10 @@ export default function OnboardOrganizationPage() {
                 <div className="space-y-2">
                   <Label>Slug *</Label>
                   <Input
-                    {...register("slug")}
+                    {...slugField}
                     onChange={(event) => {
                       setSlugTouched(true);
-                      register("slug").onChange(event);
+                      slugField.onChange(event);
                     }}
                     placeholder="carewell-dublin"
                   />
@@ -229,12 +345,50 @@ export default function OnboardOrganizationPage() {
                     </p>
                   ) : null}
                 </div>
-                <div className="space-y-2">
-                  <Label>Subdomain (optional)</Label>
-                  <Input
-                    {...register("subdomain")}
-                    placeholder="carewell"
-                  />
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Subdomain *</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      {...subdomainField}
+                      onChange={(event) => {
+                        setCustomSubdomain(true);
+                        subdomainField.onChange(event);
+                      }}
+                      placeholder="carewell-dublin"
+                    />
+                    <span className="text-xs text-slate-500">.{ORG_DOMAIN}</span>
+                  </div>
+                  {formState.errors.subdomain ? (
+                    <p className="text-xs text-danger-500">
+                      {formState.errors.subdomain.message}
+                    </p>
+                  ) : null}
+                  {watchedSubdomain ? (
+                    <div className="text-xs text-slate-400">
+                      {checkingAvailability ? (
+                        <span>Checking availability...</span>
+                      ) : subdomainAvailable === true ? (
+                        <span className="text-emerald-400">Available</span>
+                      ) : subdomainAvailable === false ? (
+                        <span className="text-danger-500">{availabilityMessage}</span>
+                      ) : availabilityMessage ? (
+                        <span>{availabilityMessage}</span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {watchedSubdomain && isValidSubdomain(watchedSubdomain) ? (
+                    <p className="text-xs text-slate-500">
+                      Organization URL:{" "}
+                      <span className="font-mono text-slate-200">
+                        {getOrganizationUrl(watchedSubdomain)}
+                      </span>
+                    </p>
+                  ) : null}
+                  {!customSubdomain && watchedSubdomain ? (
+                    <p className="text-[11px] uppercase tracking-[0.3em] text-slate-500">
+                      Auto-generated from organization name
+                    </p>
+                  ) : null}
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <Label>Logo Upload (optional)</Label>
@@ -382,6 +536,10 @@ export default function OnboardOrganizationPage() {
                   <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Organization</p>
                   <div className="mt-2">Name: {review.organizationName}</div>
                   <div>Slug: {review.slug}</div>
+                  <div>Subdomain: {review.subdomain}</div>
+                  {review.subdomain ? (
+                    <div>URL: {getOrganizationUrl(review.subdomain)}</div>
+                  ) : null}
                   <div>Email: {review.billingEmail}</div>
                 </div>
                 <div>
@@ -414,7 +572,7 @@ export default function OnboardOrganizationPage() {
                 Back
               </Button>
               {currentStep < steps.length - 1 ? (
-                <Button type="button" onClick={handleNext}>
+                <Button type="button" onClick={handleNext} disabled={disableNext}>
                   Next
                 </Button>
               ) : (

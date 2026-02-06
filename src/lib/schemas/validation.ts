@@ -1,4 +1,5 @@
 ﻿import { z } from "zod";
+import { isValidSubdomain } from "@/lib/utils/subdomain";
 
 export const onboardingSchema = z.object({
   organizationName: z.string().min(2, "Organization name is required"),
@@ -7,7 +8,10 @@ export const onboardingSchema = z.object({
     .min(2, "Slug is required")
     .regex(/^[a-z0-9-]+$/, "Slug can only contain lowercase letters, numbers, and dashes"),
   billingEmail: z.string().email("Billing email is required"),
-  subdomain: z.string().optional().or(z.literal("")),
+  subdomain: z
+    .string()
+    .min(1, "Subdomain is required")
+    .refine((value) => isValidSubdomain(value), "Subdomain is invalid or reserved"),
   logo: z.any().optional(),
   plan: z.enum(["STARTER", "PROFESSIONAL", "ENTERPRISE"]),
   billingCycle: z.enum(["MONTHLY", "ANNUAL"]),

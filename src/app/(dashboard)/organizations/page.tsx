@@ -195,13 +195,26 @@ export default function OrganizationsPage() {
           <div>
             <div className="text-sm font-medium text-white">{row.original.name}</div>
             <div className="text-xs text-slate-500">{row.original.slug}</div>
-            <div className="text-xs text-slate-600">
-              {row.original.subdomain
-                ? `${row.original.subdomain}.${ORG_DOMAIN}`
-                : "—"}
-            </div>
           </div>
         ),
+      },
+      {
+        accessorKey: "subdomain",
+        header: "Subdomain",
+        cell: ({ row }) =>
+          row.original.subdomain ? (
+            <a
+              href={`https://${row.original.subdomain}.${ORG_DOMAIN}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-mono text-accent-300 hover:underline"
+              onClick={(event) => event.stopPropagation()}
+            >
+              {row.original.subdomain}.{ORG_DOMAIN}
+            </a>
+          ) : (
+            <span className="text-xs text-slate-500">—</span>
+          ),
       },
       {
         accessorKey: "plan",

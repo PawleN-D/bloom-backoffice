@@ -8,6 +8,7 @@ import type {
   SubscriptionSummary,
   SupportTicketSummary,
 } from "@/types";
+import { getOrganizationUrl, isValidSubdomain } from "@/lib/utils/subdomain";
 
 type OrganizationsResponse = { data?: unknown[] } | unknown[];
 
@@ -17,6 +18,12 @@ type ImpersonationResponse = {
 };
 
 type ApiPayload<T> = { data?: T } | T;
+type SubdomainAvailability = {
+  available: boolean;
+  subdomain: string;
+  url?: string;
+  reason?: string;
+};
 
 function normalizePlan(value: unknown): OrganizationPlan {
   const normalized = String(value ?? "").toUpperCase();
@@ -149,6 +156,44 @@ export async function fetchOrganizations(): Promise<OrganizationSummary[]> {
     : [];
 
   return data.map((item) => toOrganizationSummary(item as Record<string, unknown>));
+}
+
+export async function checkSubdomainAvailability(
+  subdomain: string
+): Promise<SubdomainAvailability> {
+  const normalized = subdomain.toLowerCase().trim();
+  if (!normalized) {
+    return { available: false, subdomain: normalized, reason: "Subdomain is required." };
+  }
+  if (!isValidSubdomain(normalized)) {
+    return { available: false, subdomain: normalized, reason: "Subdomain is invalid or reserved." };
+  }
+
+  const response = await apiClient.get<ApiPayload<unknown>>(
+    `/api/admin/organizations?search=${encodeURIComponent(normalized)}`
+  );
+  const payload = response.data as { data?: unknown };
+  const raw = payload?.data ?? response.data;
+  const organizations = Array.isArray((raw as { organizations?: unknown[] })?.organizations)
+    ? (raw as { organizations: unknown[] }).organizations
+    : Array.isArray(raw)
+    ? raw
+    : [];
+
+  const exists = organizations.some((item) => {
+    if (!item || typeof item !== "object") return false;
+    const record = item as Record<string, unknown>;
+    const candidate = String(record.subdomain ?? "").toLowerCase();
+    const slug = String(record.slug ?? "").toLowerCase();
+    return candidate === normalized || slug === normalized;
+  });
+
+  return {
+    available: !exists,
+    subdomain: normalized,
+    url: getOrganizationUrl(normalized),
+    reason: exists ? "Subdomain already in use." : undefined,
+  };
 }
 
 export async function fetchOrganization(id: string): Promise<OrganizationSummary> {

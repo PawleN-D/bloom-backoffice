@@ -17,7 +17,7 @@ import {
   fetchOrganizationTickets,
   fetchOrganizationUsers,
 } from "@/lib/api/organizations";
-import { ORG_DOMAIN } from "@/lib/config";
+import { getOrganizationUrl } from "@/lib/utils/subdomain";
 import type {
   OrganizationActivity,
   OrganizationSummary,
@@ -182,11 +182,11 @@ export default function OrganizationDetailPage() {
     setError(null);
   };
 
-  const subdomain = useMemo(() => {
-    const value = organization?.subdomain;
-    if (!value) return "—";
-    return `${value}.${ORG_DOMAIN}`;
-  }, [organization]);
+  const subdomain = useMemo(() => organization?.subdomain ?? null, [organization]);
+  const organizationUrl = useMemo(
+    () => (subdomain ? getOrganizationUrl(subdomain) : null),
+    [subdomain]
+  );
 
   const handleSuspendToggle = () => {
     if (!organization) return;
@@ -297,7 +297,42 @@ export default function OrganizationDetailPage() {
               <div className="mt-4 grid gap-3 text-sm text-slate-200">
                 <div>Name: {organization.name}</div>
                 <div>Slug: {organization.slug}</div>
-                <div>Subdomain: {subdomain}</div>
+                <div>Subdomain: {subdomain ?? "—"}</div>
+                <div>
+                  Organization URL:{" "}
+                  {organizationUrl ? (
+                    <span className="inline-flex flex-wrap items-center gap-2">
+                      <a
+                        href={organizationUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-accent-300 hover:underline"
+                      >
+                        {organizationUrl}
+                      </a>
+                      <button
+                        type="button"
+                        className="rounded-md border border-white/10 px-2 py-1 text-[11px] uppercase tracking-[0.2em] text-slate-400"
+                        onClick={() => {
+                          void navigator.clipboard.writeText(organizationUrl);
+                        }}
+                      >
+                        Copy
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-md bg-accent-500/20 px-2 py-1 text-[11px] uppercase tracking-[0.2em] text-accent-200"
+                        onClick={() => {
+                          window.open(`${organizationUrl}/login`, "_blank", "noopener,noreferrer");
+                        }}
+                      >
+                        Open
+                      </button>
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </div>
                 <div>Billing Email: {organization.billingEmail || "—"}</div>
                 <div>Created: {formatDate(organization.createdAt)}</div>
               </div>
