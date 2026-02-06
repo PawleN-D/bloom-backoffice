@@ -44,22 +44,29 @@ async function proxyRequest(request: NextRequest, pathSegments: string[]) {
   });
 }
 
-export async function GET(request: NextRequest, { params }: { params: { path: string[] } }) {
-  return proxyRequest(request, params.path);
+type RouteContext = { params?: Promise<{ path?: string[] }> };
+
+async function getPathSegments(context: RouteContext) {
+  const params = await context.params;
+  return params?.path ?? [];
 }
 
-export async function POST(request: NextRequest, { params }: { params: { path: string[] } }) {
-  return proxyRequest(request, params.path);
+export async function GET(request: NextRequest, context: RouteContext) {
+  return proxyRequest(request, await getPathSegments(context));
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { path: string[] } }) {
-  return proxyRequest(request, params.path);
+export async function POST(request: NextRequest, context: RouteContext) {
+  return proxyRequest(request, await getPathSegments(context));
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { path: string[] } }) {
-  return proxyRequest(request, params.path);
+export async function PUT(request: NextRequest, context: RouteContext) {
+  return proxyRequest(request, await getPathSegments(context));
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { path: string[] } }) {
-  return proxyRequest(request, params.path);
+export async function PATCH(request: NextRequest, context: RouteContext) {
+  return proxyRequest(request, await getPathSegments(context));
+}
+
+export async function DELETE(request: NextRequest, context: RouteContext) {
+  return proxyRequest(request, await getPathSegments(context));
 }
