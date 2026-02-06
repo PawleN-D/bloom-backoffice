@@ -4,6 +4,8 @@ import { buildAuthResponse, getAuthCookieOptions, AUTH_COOKIE_NAME } from "@/lib
 import { SERVER_API_BASE_URL } from "@/lib/config";
 import type { AuthResponse } from "@/types";
 
+export const runtime = "edge";
+
 export async function POST(request: Request) {
   if (!SERVER_API_BASE_URL) {
     return NextResponse.json(

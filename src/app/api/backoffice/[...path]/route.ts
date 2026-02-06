@@ -4,6 +4,8 @@ import { cookies } from "next/headers";
 import { AUTH_COOKIE_NAME } from "@/lib/authCookies";
 import { SERVER_API_BASE_URL } from "@/lib/config";
 
+export const runtime = "edge";
+
 async function proxyRequest(request: NextRequest, pathSegments: string[]) {
   if (!SERVER_API_BASE_URL) {
     return NextResponse.json(
