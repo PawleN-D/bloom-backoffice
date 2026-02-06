@@ -12,7 +12,6 @@ import HealthScore from "@/components/HealthScore";
 import OrganizationActions from "@/components/OrganizationActions";
 import PlanBadge from "@/components/PlanBadge";
 import StatusBadge from "@/components/StatusBadge";
-import { organizationSummaries } from "@/data/mock";
 import {
   fetchOrganization,
   fetchOrganizationActivity,
@@ -33,6 +32,12 @@ const tabs = ["Overview", "Subscription", "Users", "Activity", "Support"] as con
 
 type Tab = (typeof tabs)[number];
 
+const currencyFormatter = new Intl.NumberFormat("en-IE", {
+  style: "currency",
+  currency: "EUR",
+  maximumFractionDigits: 0,
+});
+
 type TabState = {
   loading: boolean;
   error: string | null;
@@ -40,16 +45,16 @@ type TabState = {
 };
 
 function formatDate(value: string | null) {
-  if (!value) return "—";
+  if (!value) return "-";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) return "-";
   return format(date, "MMM d, yyyy");
 }
 
 function formatRelative(value: string | null) {
-  if (!value) return "—";
+  if (!value) return "-";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) return "-";
   return formatDistanceToNow(date, { addSuffix: true });
 }
 
@@ -60,7 +65,6 @@ export default function OrganizationDetailPage() {
   const [organization, setOrganization] = useState<OrganizationSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [usingSample, setUsingSample] = useState(false);
 
   const [subscription, setSubscription] = useState<SubscriptionSummary | null>(null);
   const [users, setUsers] = useState<OrganizationUser[]>([]);
@@ -99,7 +103,6 @@ export default function OrganizationDetailPage() {
       .then((data) => {
         if (!isMounted) return;
         setOrganization(data);
-        setUsingSample(false);
       })
       .catch(() => {
         if (!isMounted) return;
@@ -169,7 +172,6 @@ export default function OrganizationDetailPage() {
     fetchOrganization(id)
       .then((data) => {
         setOrganization(data);
-        setUsingSample(false);
       })
       .catch(() => {
         setError("Unable to load organization. Check API connectivity.");
@@ -178,16 +180,10 @@ export default function OrganizationDetailPage() {
       .finally(() => setIsLoading(false));
   };
 
-  const handleUseSample = () => {
-    const sample = organizationSummaries.find((org) => org.id === id) ?? null;
-    setOrganization(sample);
-    setUsingSample(true);
-    setError(null);
-  };
 
-  const subdomain = useMemo(() => organization?.subdomain ?? null, [organization]);
+  const subdomain = useMemo(() => organization-.subdomain -- null, [organization]);
   const organizationUrl = useMemo(
-    () => (subdomain ? getOrganizationUrl(subdomain) : null),
+    () => (subdomain - getOrganizationUrl(subdomain) : null),
     [subdomain]
   );
 
@@ -195,7 +191,7 @@ export default function OrganizationDetailPage() {
     if (!organization) return;
     setOrganization({
       ...organization,
-      status: organization.status === "SUSPENDED" ? "ACTIVE" : "SUSPENDED",
+      status: organization.status === "SUSPENDED" - "ACTIVE" : "SUSPENDED",
     });
   };
 
@@ -211,7 +207,7 @@ export default function OrganizationDetailPage() {
     return (
       <Card className="space-y-4">
         <p className="text-sm text-slate-300">Organization not found.</p>
-        {error ? (
+        {error - (
           <div className="rounded-lg border border-danger-500/40 bg-danger-500/10 px-4 py-3 text-sm text-danger-500">
             {error}
             <div className="mt-3 flex flex-wrap gap-2">
@@ -221,13 +217,6 @@ export default function OrganizationDetailPage() {
                 onClick={handleRetry}
               >
                 Retry
-              </button>
-              <button
-                type="button"
-                className="rounded-lg px-3 py-2 text-sm text-slate-400"
-                onClick={handleUseSample}
-              >
-                Use Sample Data
               </button>
             </div>
           </div>
@@ -240,10 +229,10 @@ export default function OrganizationDetailPage() {
   }
 
   const usersPercent = organization.usersLimit
-    ? Math.min(100, Math.round((organization.usersUsed / organization.usersLimit) * 100))
+    - Math.min(100, Math.round((organization.usersUsed / organization.usersLimit) * 100))
     : 0;
   const clientsPercent = organization.clientsLimit
-    ? Math.min(100, Math.round((organization.clientsUsed / organization.clientsLimit) * 100))
+    - Math.min(100, Math.round((organization.clientsUsed / organization.clientsLimit) * 100))
     : 0;
 
   return (
@@ -269,12 +258,6 @@ export default function OrganizationDetailPage() {
         </div>
       </div>
 
-      {usingSample ? (
-        <div className="rounded-lg border border-white/10 bg-slate-900/60 px-4 py-3 text-xs uppercase tracking-[0.3em] text-slate-500">
-          Showing sample data
-        </div>
-      ) : null}
-
       <div className="flex flex-wrap gap-3">
         {tabs.map((tab) => (
           <button
@@ -283,7 +266,7 @@ export default function OrganizationDetailPage() {
             onClick={() => setActiveTab(tab)}
             className={`rounded-full px-4 py-2 text-xs uppercase tracking-[0.3em] transition ${
               activeTab === tab
-                ? "bg-accent-500/20 text-accent-300"
+                - "bg-accent-500/20 text-accent-300"
                 : "bg-slate-900/60 text-slate-400 hover:text-slate-200"
             }`}
           >
@@ -292,7 +275,7 @@ export default function OrganizationDetailPage() {
         ))}
       </div>
 
-      {activeTab === "Overview" ? (
+      {activeTab === "Overview" - (
         <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
           <Card className="space-y-6">
             <div>
@@ -300,10 +283,10 @@ export default function OrganizationDetailPage() {
               <div className="mt-4 grid gap-3 text-sm text-slate-200">
                 <div>Name: {organization.name}</div>
                 <div>Slug: {organization.slug}</div>
-                <div>Subdomain: {subdomain ?? "—"}</div>
+                <div>Subdomain: {subdomain -- "-"}</div>
                 <div>
                   Organization URL:{" "}
-                  {organizationUrl ? (
+                  {organizationUrl - (
                     <span className="inline-flex flex-wrap items-center gap-2">
                       <a
                         href={organizationUrl}
@@ -333,10 +316,10 @@ export default function OrganizationDetailPage() {
                       </button>
                     </span>
                   ) : (
-                    "—"
+                    "-"
                   )}
                 </div>
-                <div>Billing Email: {organization.billingEmail || "—"}</div>
+                <div>Billing Email: {organization.billingEmail || "-"}</div>
                 <div>Created: {formatDate(organization.createdAt)}</div>
               </div>
             </div>
@@ -368,18 +351,18 @@ export default function OrganizationDetailPage() {
         </div>
       ) : null}
 
-      {activeTab === "Subscription" ? (
+      {activeTab === "Subscription" - (
         <Card className="space-y-4">
-          {tabState.Subscription.loading ? (
+          {tabState.Subscription.loading - (
             <p className="text-sm text-slate-300">Loading subscription...</p>
-          ) : tabState.Subscription.error ? (
+          ) : tabState.Subscription.error - (
             <p className="text-sm text-danger-500">{tabState.Subscription.error}</p>
-          ) : subscription ? (
+          ) : subscription - (
             <div className="grid gap-3 text-sm text-slate-300">
               <div>Plan: {subscription.plan}</div>
               <div>Billing Cycle: {subscription.billingCycle}</div>
               <div>Status: {subscription.status}</div>
-              <div>MRR: €{subscription.mrr}</div>
+              <div>MRR: {currencyFormatter.format(subscription.mrr)}</div>
               <div>Next Billing: {formatDate(subscription.nextBillingDate)}</div>
               <div>Payment Status: {subscription.paymentStatus}</div>
               <div>Trial Ends: {formatDate(subscription.trialEndsAt)}</div>
@@ -390,13 +373,13 @@ export default function OrganizationDetailPage() {
         </Card>
       ) : null}
 
-      {activeTab === "Users" ? (
+      {activeTab === "Users" - (
         <Card className="space-y-4">
-          {tabState.Users.loading ? (
+          {tabState.Users.loading - (
             <p className="text-sm text-slate-300">Loading users...</p>
-          ) : tabState.Users.error ? (
+          ) : tabState.Users.error - (
             <p className="text-sm text-danger-500">{tabState.Users.error}</p>
-          ) : users.length ? (
+          ) : users.length - (
             <div className="overflow-hidden rounded-lg border border-white/10">
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-900/70 text-xs uppercase tracking-[0.3em] text-slate-500">
@@ -427,19 +410,19 @@ export default function OrganizationDetailPage() {
         </Card>
       ) : null}
 
-      {activeTab === "Activity" ? (
+      {activeTab === "Activity" - (
         <Card className="space-y-4">
-          {tabState.Activity.loading ? (
+          {tabState.Activity.loading - (
             <p className="text-sm text-slate-300">Loading activity...</p>
-          ) : tabState.Activity.error ? (
+          ) : tabState.Activity.error - (
             <p className="text-sm text-danger-500">{tabState.Activity.error}</p>
-          ) : activity.length ? (
+          ) : activity.length - (
             <div className="space-y-3">
               {activity.map((item) => (
                 <div key={item.id} className="rounded-lg border border-white/10 bg-slate-900/60 px-4 py-3">
                   <div className="text-sm text-slate-200">{item.message}</div>
                   <div className="mt-1 text-xs text-slate-500">
-                    {item.actor} • {formatRelative(item.timestamp)}
+                    {item.actor} - {formatRelative(item.timestamp)}
                   </div>
                 </div>
               ))}
@@ -450,19 +433,19 @@ export default function OrganizationDetailPage() {
         </Card>
       ) : null}
 
-      {activeTab === "Support" ? (
+      {activeTab === "Support" - (
         <Card className="space-y-4">
-          {tabState.Support.loading ? (
+          {tabState.Support.loading - (
             <p className="text-sm text-slate-300">Loading tickets...</p>
-          ) : tabState.Support.error ? (
+          ) : tabState.Support.error - (
             <p className="text-sm text-danger-500">{tabState.Support.error}</p>
-          ) : tickets.length ? (
+          ) : tickets.length - (
             <div className="space-y-3">
               {tickets.map((ticket) => (
                 <div key={ticket.id} className="rounded-lg border border-white/10 bg-slate-900/60 px-4 py-3">
                   <div className="text-sm text-slate-200">{ticket.subject}</div>
                   <div className="mt-1 text-xs text-slate-500">
-                    Status: {ticket.status} • Priority: {ticket.priority} • {formatRelative(ticket.createdAt)}
+                    Status: {ticket.status} - Priority: {ticket.priority} - {formatRelative(ticket.createdAt)}
                   </div>
                   <div className="mt-1 text-xs text-slate-500">Assigned: {ticket.assignee}</div>
                 </div>

@@ -1,4 +1,4 @@
-﻿import { apiClient } from "@/lib/apiClient";
+import { apiClient } from "@/lib/apiClient";
 import type {
   OrganizationPlan,
   OrganizationStatus,
@@ -7,6 +7,7 @@ import type {
   OrganizationUser,
   SubscriptionSummary,
   SupportTicketSummary,
+  PlanOverrideFlag,
 } from "@/types";
 import { getOrganizationUrl, isValidSubdomain } from "@/lib/utils/subdomain";
 
@@ -61,7 +62,7 @@ function normalizeIsoDate(value: unknown): string | null {
   return date.toISOString();
 }
 
-function normalizeString(value: unknown, fallback = "—"): string {
+function normalizeString(value: unknown, fallback = "-"): string {
   if (typeof value === "string" && value.trim()) {
     return value;
   }
@@ -225,7 +226,7 @@ export async function fetchOrganizationSubscription(id: string): Promise<Subscri
     nextBillingDate: normalizeIsoDate(
       record.nextBillingDate ?? record.nextInvoiceDate ?? record.renewalDate
     ),
-    paymentStatus: normalizeString(record.paymentStatus ?? record.payment_state ?? "—"),
+    paymentStatus: normalizeString(record.paymentStatus ?? record.payment_state ?? "-"),
     trialEndsAt: normalizeIsoDate(record.trialEndsAt ?? record.trialEndDate),
   };
 }
@@ -244,11 +245,11 @@ export async function fetchOrganizationUsers(id: string): Promise<OrganizationUs
     id: String(user.id ?? user._id ?? user.email ?? "user"),
     name: normalizeString(
       user.name ?? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim(),
-      "—"
+      "-"
     ),
-    email: normalizeString(user.email, "—"),
-    role: normalizeString(user.role ?? user.permission ?? "—"),
-    status: normalizeString(user.status ?? user.state ?? "—"),
+    email: normalizeString(user.email, "-"),
+    role: normalizeString(user.role ?? user.permission ?? "-"),
+    status: normalizeString(user.status ?? user.state ?? "-"),
     lastLoginAt: null,
   }));
 }
@@ -263,7 +264,7 @@ export async function fetchOrganizationActivity(id: string): Promise<Organizatio
     id: String(item.id ?? item._id ?? Math.random().toString(36).slice(2)),
     message: normalizeString(item.action ?? item.message ?? "Activity updated"),
     actor: normalizeString(
-      (item.user as { email?: string } | undefined)?.email ?? item.actor ?? "—"
+      (item.user as { email?: string } | undefined)?.email ?? item.actor ?? "-"
     ),
     timestamp: normalizeIsoDate(item.createdAt ?? item.timestamp ?? item.time) ?? "",
   }));
@@ -278,13 +279,54 @@ export async function fetchOrganizationTickets(id: string): Promise<SupportTicke
   return normalizeArray<Record<string, unknown>>(raw).map((ticket) => ({
     id: String(ticket.id ?? ticket._id ?? ticket.number ?? "ticket"),
     subject: normalizeString(ticket.subject ?? ticket.title ?? "Support ticket"),
-    status: normalizeString(ticket.status ?? ticket.state ?? "—"),
-    priority: normalizeString(ticket.priority ?? "—"),
+    status: normalizeString(ticket.status ?? ticket.state ?? "-"),
+    priority: normalizeString(ticket.priority ?? "-"),
     createdAt: normalizeIsoDate(ticket.createdAt ?? ticket.openedAt),
     assignee: normalizeString(
       (ticket.assignedTo as { email?: string } | undefined)?.email ?? ticket.assignee ?? "Unassigned"
     ),
   }));
+}
+
+export async function fetchOrganizationFeatures(
+  id: string
+): Promise<{ plan: OrganizationPlan | null; flags: PlanOverrideFlag[] }> {
+  const response = await apiClient.get<ApiPayload<unknown>>(
+    `/api/admin/organizations/${id}/features`
+  );
+  const payload = response.data as { data?: unknown };
+  const raw = payload?.data ?? response.data;
+
+  if (!raw || typeof raw !== "object") {
+    return { plan: null, flags: [] };
+  }
+
+  const record = raw as {
+    organization?: Record<string, unknown>;
+    features?: unknown[];
+  };
+
+  const organization = record.organization ?? {};
+  const plan = normalizePlan(
+    (organization as Record<string, unknown>).plan ??
+      (organization as Record<string, unknown>).subscriptionPlan ??
+      (organization as Record<string, unknown>).tier ??
+      null
+  );
+
+  const features = normalizeArray<Record<string, unknown>>(record.features ?? []);
+  const flags = features.map((item) => {
+    const feature = (item.feature as Record<string, unknown> | undefined) ?? {};
+    const key = String(feature.key ?? item.featureKey ?? item.id ?? "feature");
+    const label = normalizeString(feature.name ?? item.name ?? key);
+    const description = normalizeString(feature.description ?? item.description ?? "");
+    const enabled = Boolean(
+      item.enabled ?? (item as { isEnabled?: boolean }).isEnabled ?? feature.defaultEnabled ?? false
+    );
+    return { key, label, description, enabled };
+  });
+
+  return { plan, flags };
 }
 
 export async function impersonateOrganization(id: string): Promise<ImpersonationResponse> {

@@ -3,9 +3,21 @@
 import type { ReactNode } from "react";
 import { useState } from "react";
 import Sidebar from "@/components/Sidebar";
+import { useAuth } from "@/contexts/AuthContext";
+import { isPagesDevHost, resolveTenantFromWindow } from "@/lib/tenant";
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { logout } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+    if (typeof window === "undefined") return;
+    const tenant = resolveTenantFromWindow();
+    const loginPath =
+      tenant && isPagesDevHost(window.location.host) ? `/${tenant}/login` : "/login";
+    window.location.assign(loginPath);
+  };
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]">
@@ -48,9 +60,18 @@ export default function AppShell({ children }: { children: ReactNode }) {
               <h1 className="text-xl font-semibold text-white">HQ Operations</h1>
             </div>
           </div>
-          <div className="flex items-center gap-3 rounded-full border border-white/10 bg-slate-900/70 px-4 py-2">
-            <span className="h-2 w-2 rounded-full bg-success-500" />
-            <span className="text-xs text-slate-300">Live systems healthy</span>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-3 rounded-full border border-white/10 bg-slate-900/70 px-4 py-2">
+              <span className="h-2 w-2 rounded-full bg-success-500" />
+              <span className="text-xs text-slate-300">Live systems healthy</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="rounded-full border border-white/10 bg-slate-900/70 px-4 py-2 text-xs font-medium text-slate-200 transition hover:bg-slate-900"
+            >
+              Log out
+            </button>
           </div>
         </header>
         <main className="flex-1 px-6 py-8 lg:px-8 lg:py-10">{children}</main>

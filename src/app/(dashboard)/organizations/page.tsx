@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -20,9 +20,8 @@ import PlanBadge from "@/components/PlanBadge";
 import SearchBar from "@/components/SearchBar";
 import StatusBadge from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { organizationSummaries } from "@/data/mock";
 import { fetchOrganizations } from "@/lib/api/organizations";
-import { ORG_DOMAIN } from "@/lib/config";
+import { getOrganizationUrl } from "@/lib/utils/subdomain";
 import type { OrganizationSummary } from "@/types";
 
 const planOptions = [
@@ -54,9 +53,9 @@ const currencyFormatter = new Intl.NumberFormat("en-IE", {
 });
 
 function formatRelativeDate(value: string | null) {
-  if (!value) return "—";
+  if (!value) return "-";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) return "-";
   return formatDistanceToNow(date, { addSuffix: true });
 }
 
@@ -73,7 +72,6 @@ export default function OrganizationsPage() {
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [usingSample, setUsingSample] = useState(false);
 
   useEffect(() => {
     const handle = setTimeout(() => setSearch(searchInput), 300);
@@ -89,7 +87,6 @@ export default function OrganizationsPage() {
       .then((data) => {
         if (!isMounted) return;
         setRows(data);
-        setUsingSample(false);
       })
       .catch(() => {
         if (!isMounted) return;
@@ -116,7 +113,6 @@ export default function OrganizationsPage() {
     fetchOrganizations()
       .then((data) => {
         setRows(data);
-        setUsingSample(false);
       })
       .catch(() => {
         setError("Unable to load organizations. Check API connectivity.");
@@ -125,11 +121,6 @@ export default function OrganizationsPage() {
       .finally(() => setIsLoading(false));
   };
 
-  const handleUseSample = () => {
-    setRows(organizationSummaries);
-    setUsingSample(true);
-    setError(null);
-  };
 
   const filteredRows = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -201,20 +192,23 @@ export default function OrganizationsPage() {
       {
         accessorKey: "subdomain",
         header: "Subdomain",
-        cell: ({ row }) =>
-          row.original.subdomain ? (
+        cell: ({ row }) => {
+          if (!row.original.subdomain) {
+            return <span className="text-xs text-slate-500">-</span>;
+          }
+          const orgUrl = getOrganizationUrl(row.original.subdomain);
+          return (
             <a
-              href={`https://${row.original.subdomain}.${ORG_DOMAIN}`}
+              href={orgUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs font-mono text-accent-300 hover:underline"
               onClick={(event) => event.stopPropagation()}
             >
-              {row.original.subdomain}.{ORG_DOMAIN}
+              {orgUrl}
             </a>
-          ) : (
-            <span className="text-xs text-slate-500">—</span>
-          ),
+          );
+        },
       },
       {
         accessorKey: "plan",
@@ -325,7 +319,7 @@ export default function OrganizationsPage() {
     ];
     const lines = filteredRows.map((row) => [
       row.name,
-      row.subdomain ? `${row.subdomain}.${ORG_DOMAIN}` : "",
+      row.subdomain ? getOrganizationUrl(row.subdomain) : "",
       row.plan,
       row.status,
       `${row.usersUsed}/${row.usersLimit}`,
@@ -397,16 +391,7 @@ export default function OrganizationsPage() {
               <Button variant="secondary" onClick={handleRetry}>
                 Retry
               </Button>
-              <Button variant="ghost" onClick={handleUseSample}>
-                Use Sample Data
-              </Button>
             </div>
-          </div>
-        ) : null}
-
-        {usingSample ? (
-          <div className="rounded-lg border border-white/10 bg-slate-900/60 px-4 py-3 text-xs uppercase tracking-[0.3em] text-slate-500">
-            Showing sample data
           </div>
         ) : null}
 

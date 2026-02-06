@@ -47,7 +47,8 @@ export async function POST(request: Request) {
   }
 
   const cookieStore = await cookies();
-  cookieStore.set(AUTH_COOKIE_NAME, auth.token, getAuthCookieOptions());
+  const host = request.headers.get("host") ?? undefined;
+  cookieStore.set(AUTH_COOKIE_NAME, auth.token, getAuthCookieOptions(host));
 
   return NextResponse.json(buildAuthResponse(auth.user));
 }
