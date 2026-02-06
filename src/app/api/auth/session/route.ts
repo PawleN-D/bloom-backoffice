@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { AUTH_COOKIE_NAME } from "@/lib/authCookies";
 
 export async function GET() {
-  const token = cookies().get(AUTH_COOKIE_NAME)?.value;
+  const cookieStore = await cookies();
+  const token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
   return NextResponse.json({ authenticated: Boolean(token) });
 }

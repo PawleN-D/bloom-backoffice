@@ -39,7 +39,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Invalid login response." }, { status: 502 });
   }
 
-  cookies().set(AUTH_COOKIE_NAME, auth.token, getAuthCookieOptions());
+  const cookieStore = await cookies();
+  cookieStore.set(AUTH_COOKIE_NAME, auth.token, getAuthCookieOptions());
 
   return NextResponse.json(buildAuthResponse(auth.user));
 }

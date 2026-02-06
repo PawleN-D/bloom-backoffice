@@ -12,7 +12,8 @@ async function proxyRequest(request: NextRequest, pathSegments: string[]) {
     );
   }
 
-  const token = cookies().get(AUTH_COOKIE_NAME)?.value;
+  const cookieStore = await cookies();
+  const token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
   if (!token) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
@@ -44,7 +45,7 @@ async function proxyRequest(request: NextRequest, pathSegments: string[]) {
   });
 }
 
-type RouteContext = { params?: Promise<{ path?: string[] }> };
+type RouteContext = { params: Promise<{ path?: string[] }> };
 
 async function getPathSegments(context: RouteContext) {
   const params = await context.params;
