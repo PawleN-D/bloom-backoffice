@@ -5,7 +5,7 @@ import RevenueTrendChart from "@/components/charts/RevenueTrendChart";
 import SignupChurnChart from "@/components/charts/SignupChurnChart";
 import { AUTH_COOKIE_NAME } from "@/lib/authCookies";
 import { SERVER_API_BASE_URL } from "@/lib/config";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 
 export const runtime = "edge";
 
@@ -58,14 +58,9 @@ async function getAnalyticsData(): Promise<AnalyticsData | null> {
     return null;
   }
 
-  const incomingHeaders = await headers();
-  const tenant = incomingHeaders.get("x-tenant");
   const requestHeaders = new Headers({
     authorization: `Bearer ${token}`,
   });
-  if (tenant) {
-    requestHeaders.set("x-tenant", tenant);
-  }
 
   try {
     const [statsResponse, analyticsResponse] = await Promise.all([

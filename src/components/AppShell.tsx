@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import { useAuth } from "@/contexts/AuthContext";
-import { isPagesDevHost, resolveTenantFromWindow } from "@/lib/tenant";
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -13,10 +12,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const handleLogout = async () => {
     await logout();
     if (typeof window === "undefined") return;
-    const tenant = resolveTenantFromWindow();
-    const loginPath =
-      tenant && isPagesDevHost(window.location.host) ? `/${tenant}/login` : "/login";
-    window.location.assign(loginPath);
+    window.location.assign("/login");
   };
 
   return (

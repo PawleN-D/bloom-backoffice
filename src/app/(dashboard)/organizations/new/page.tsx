@@ -18,8 +18,6 @@ import {
   getOrganizationUrl,
   isValidSubdomain,
 } from "@/lib/utils/subdomain";
-import { ORG_DOMAIN } from "@/lib/config";
-import { isPagesDevHost } from "@/lib/tenant";
 
 const steps = [
   "Organization",
@@ -76,16 +74,6 @@ export default function OnboardOrganizationPage() {
     ownerEmail?: string;
     temporaryPassword?: string;
   } | null>(null);
-  const [host, setHost] = useState<string>("");
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setHost(window.location.host);
-    }
-  }, []);
-
-  const isPagesDev = useMemo(() => (host ? isPagesDevHost(host) : false), [host]);
-
   const form = useForm<OnboardingFormValues>({
     resolver: zodResolver(onboardingSchema),
     defaultValues: {
@@ -187,7 +175,7 @@ export default function OnboardOrganizationPage() {
       const result = await createOrganization(values);
       const resolvedSubdomain = result.subdomain ?? values.subdomain ?? "";
       const organizationUrl = resolvedSubdomain
-        ? getOrganizationUrl(resolvedSubdomain, host)
+        ? getOrganizationUrl(resolvedSubdomain)
         : undefined;
       const loginUrl =
         result.loginUrl ??
@@ -366,9 +354,6 @@ export default function OnboardOrganizationPage() {
                       }}
                       placeholder="carewell-dublin"
                     />
-                    {!isPagesDev ? (
-                      <span className="text-xs text-slate-500">.{ORG_DOMAIN}</span>
-                    ) : null}
                   </div>
                   {formState.errors.subdomain ? (
                     <p className="text-xs text-danger-500">
@@ -392,10 +377,10 @@ export default function OnboardOrganizationPage() {
                     <p className="text-xs text-slate-500">
                       Organization URL:{" "}
                       <span className="font-mono text-slate-200">
-                        {getOrganizationUrl(watchedSubdomain, host)}
-                      </span>
-                    </p>
-                  ) : null}
+                      {getOrganizationUrl(watchedSubdomain)}
+                    </span>
+                  </p>
+                ) : null}
                   {!customSubdomain && watchedSubdomain ? (
                     <p className="text-[11px] uppercase tracking-[0.3em] text-slate-500">
                       Auto-generated from organization name
@@ -549,9 +534,7 @@ export default function OnboardOrganizationPage() {
                   <div className="mt-2">Name: {review.organizationName}</div>
                   <div>Slug: {review.slug}</div>
                   <div>Subdomain: {review.subdomain}</div>
-                  {review.subdomain ? (
-                    <div>URL: {getOrganizationUrl(review.subdomain, host)}</div>
-                  ) : null}
+                  {review.subdomain ? <div>URL: {getOrganizationUrl(review.subdomain)}</div> : null}
                   <div>Email: {review.billingEmail}</div>
                 </div>
                 <div>

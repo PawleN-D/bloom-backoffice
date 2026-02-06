@@ -1,5 +1,4 @@
 import { ORG_DOMAIN } from "@/lib/config";
-import { isPagesDevHost } from "@/lib/tenant";
 
 const RESERVED_SUBDOMAINS = [
   "www",
@@ -30,15 +29,11 @@ export function isValidSubdomain(subdomain: string): boolean {
   return !RESERVED_SUBDOMAINS.includes(normalized);
 }
 
-export function getOrganizationUrl(subdomain: string, baseHost?: string | null): string {
+export function getOrganizationUrl(subdomain: string): string {
   const normalized = subdomain.toLowerCase().trim();
-  const host =
-    baseHost ??
-    (typeof window !== "undefined" ? window.location.host : undefined) ??
-    "";
-
-  if (host && isPagesDevHost(host)) {
-    return `https://${host}/${normalized}`;
+  const baseUrl = process.env.NEXT_PUBLIC_APP_BASE_URL;
+  if (baseUrl) {
+    return `${baseUrl.replace(/\/+$/, "")}/${normalized}`;
   }
 
   return `https://${normalized}.${ORG_DOMAIN}`;

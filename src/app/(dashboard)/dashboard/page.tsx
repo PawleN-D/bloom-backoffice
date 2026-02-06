@@ -6,7 +6,7 @@ import SignupChurnChart from "@/components/charts/SignupChurnChart";
 import { AUTH_COOKIE_NAME } from "@/lib/authCookies";
 import { SERVER_API_BASE_URL } from "@/lib/config";
 import { formatDistanceToNow } from "date-fns";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 
 export const runtime = "edge";
 
@@ -77,14 +77,9 @@ async function getDashboardData(): Promise<DashboardData | null> {
     return null;
   }
 
-  const incomingHeaders = await headers();
-  const tenant = incomingHeaders.get("x-tenant");
   const requestHeaders = new Headers({
     authorization: `Bearer ${token}`,
   });
-  if (tenant) {
-    requestHeaders.set("x-tenant", tenant);
-  }
 
   try {
     const [statsResponse, analyticsResponse, auditResponse] = await Promise.all([
