@@ -12,11 +12,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const payload = await request.json();
+  const requestPayload = await request.json();
   const response = await fetch(`${SERVER_API_BASE_URL}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(requestPayload),
     cache: "no-store",
   });
 
@@ -32,8 +32,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ message }, { status: response.status });
   }
 
-  const payload = (await response.json()) as { data?: AuthResponse } | AuthResponse;
-  const auth = (payload as { data?: AuthResponse }).data ?? (payload as AuthResponse);
+  const responsePayload = (await response.json()) as { data?: AuthResponse } | AuthResponse;
+  const auth =
+    (responsePayload as { data?: AuthResponse }).data ?? (responsePayload as AuthResponse);
   if (!auth?.token || !auth?.user) {
     return NextResponse.json({ message: "Invalid login response." }, { status: 502 });
   }
