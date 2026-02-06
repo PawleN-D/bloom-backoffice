@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+﻿import type { ReactNode } from "react";
 
 export default function Card({
   children,
@@ -8,7 +8,7 @@ export default function Card({
   className?: string;
 }) {
   return (
-    <div className={`rounded-2xl border border-white/10 bg-slate-950/60 p-6 shadow-lg ${className}`}>
+    <div className={`rounded-lg border border-white/10 bg-slate-950/60 p-6 shadow-sm ${className}`}>
       {children}
     </div>
   );

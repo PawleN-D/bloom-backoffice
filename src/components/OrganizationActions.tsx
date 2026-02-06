@@ -7,12 +7,10 @@ import type { OrganizationSummary } from "@/types";
 export default function OrganizationActions({
   organization,
   onSuspendToggle,
-  onImpersonate,
   variant = "icon",
 }: {
   organization: OrganizationSummary;
   onSuspendToggle: (id: string) => void;
-  onImpersonate: (id: string) => void;
   variant?: "icon" | "button";
 }) {
   const router = useRouter();
@@ -99,13 +97,6 @@ export default function OrganizationActions({
             }
           >
             Delete (Soft)
-          </button>
-          <button
-            type="button"
-            className="w-full rounded-lg px-3 py-2 text-left text-sm text-accent-400 hover:bg-slate-900/60"
-            onClick={() => handleAction(() => onImpersonate(organization.id))}
-          >
-            Impersonate
           </button>
         </div>
       ) : null}

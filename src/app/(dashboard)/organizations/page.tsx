@@ -5,8 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import type { ColumnDef, RowSelectionState, SortingState } from "@tanstack/react-table";
-import { getCoreRowModel, getSortedRowModel, useReactTable } from "@tanstack/react-table";
-import Button from "@/components/Button";
+import {
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
 import Card from "@/components/Card";
 import DataTable from "@/components/DataTable";
 import FilterDropdown from "@/components/FilterDropdown";
@@ -15,8 +19,9 @@ import OrganizationActions from "@/components/OrganizationActions";
 import PlanBadge from "@/components/PlanBadge";
 import SearchBar from "@/components/SearchBar";
 import StatusBadge from "@/components/StatusBadge";
+import { Button } from "@/components/ui/button";
 import { organizationSummaries } from "@/data/mock";
-import { fetchOrganizations, impersonateOrganization } from "@/lib/api/organizations";
+import { fetchOrganizations } from "@/lib/api/organizations";
 import type { OrganizationSummary } from "@/types";
 
 const planOptions = [
@@ -57,16 +62,22 @@ function formatRelativeDate(value: string | null) {
 export default function OrganizationsPage() {
   const router = useRouter();
   const [rows, setRows] = useState<OrganizationSummary[]>([]);
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [planFilter, setPlanFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [healthFilter, setHealthFilter] = useState("ALL");
   const [sorting, setSorting] = useState<SortingState>([]);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [usingSample, setUsingSample] = useState(false);
+
+  useEffect(() => {
+    const handle = setTimeout(() => setSearch(searchInput), 300);
+    return () => clearTimeout(handle);
+  }, [searchInput]);
 
   useEffect(() => {
     let isMounted = true;
@@ -93,6 +104,10 @@ export default function OrganizationsPage() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+  }, [search, planFilter, statusFilter, healthFilter]);
 
   const handleRetry = () => {
     setIsLoading(true);
@@ -145,25 +160,6 @@ export default function OrganizationsPage() {
           : item
       )
     );
-  }, []);
-
-  const handleImpersonate = useCallback(async (id: string) => {
-    setActionMessage(null);
-    try {
-      const response = await impersonateOrganization(id);
-      if (response.url) {
-        window.open(response.url, "_blank", "noopener,noreferrer");
-        setActionMessage("Impersonation session opened in a new tab.");
-        return;
-      }
-      if (response.token) {
-        setActionMessage("Impersonation token issued. Connect to the Care app to use it.");
-        return;
-      }
-      setActionMessage("Impersonation request completed.");
-    } catch {
-      setActionMessage("Unable to impersonate. Check permissions or API status.");
-    }
   }, []);
 
   const columns = useMemo<ColumnDef<OrganizationSummary>[]>(
@@ -259,22 +255,23 @@ export default function OrganizationsPage() {
           <OrganizationActions
             organization={row.original}
             onSuspendToggle={handleSuspendToggle}
-            onImpersonate={handleImpersonate}
           />
         ),
       },
     ],
-    [handleImpersonate, handleSuspendToggle]
+    [handleSuspendToggle]
   );
 
   const table = useReactTable({
     data: filteredRows,
     columns,
-    state: { sorting, rowSelection },
+    state: { sorting, rowSelection, pagination },
     onSortingChange: setSorting,
     onRowSelectionChange: setRowSelection,
+    onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
     enableRowSelection: true,
   });
 
@@ -349,8 +346,8 @@ export default function OrganizationsPage() {
           <div className="space-y-2">
             <label className="text-xs uppercase tracking-[0.3em] text-slate-500">Search</label>
             <SearchBar
-              value={search}
-              onChange={setSearch}
+              value={searchInput}
+              onChange={setSearchInput}
               placeholder="Search by name, slug, or billing email"
             />
           </div>
@@ -370,12 +367,6 @@ export default function OrganizationsPage() {
             />
           </div>
         </div>
-
-        {actionMessage ? (
-          <div className="rounded-lg border border-white/10 bg-slate-900/60 px-4 py-3 text-sm text-slate-300">
-            {actionMessage}
-          </div>
-        ) : null}
 
         {error ? (
           <div className="rounded-lg border border-danger-500/40 bg-danger-500/10 px-4 py-3 text-sm text-danger-500">
@@ -405,7 +396,11 @@ export default function OrganizationsPage() {
             <Button variant="secondary" onClick={handleExportCsv}>
               Export CSV
             </Button>
-            <Button variant="danger" onClick={handleSuspendSelected} disabled={selectedIds.length === 0}>
+            <Button
+              variant="destructive"
+              onClick={handleSuspendSelected}
+              disabled={selectedIds.length === 0}
+            >
               Suspend Selected
             </Button>
           </div>
@@ -417,10 +412,32 @@ export default function OrganizationsPage() {
           <p className="text-sm text-slate-300">Loading organizations...</p>
         </Card>
       ) : (
-        <DataTable
-          table={table}
-          onRowClick={(row) => router.push(`/organizations/${row.id}`)}
-        />
+        <>
+          <DataTable table={table} onRowClick={(row) => router.push(`/organizations/${row.id}`)} />
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-400">
+            <span>
+              Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount() || 1}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => table.previousPage()}
+                disabled={!table.getCanPreviousPage()}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => table.nextPage()}
+                disabled={!table.getCanNextPage()}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

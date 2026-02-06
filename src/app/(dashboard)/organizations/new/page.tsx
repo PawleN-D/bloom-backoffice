@@ -56,7 +56,7 @@ export default function OnboardOrganizationPage() {
   const [successData, setSuccessData] = useState<{
     organizationId?: string;
     loginUrl?: string;
-    temporaryPassword?: string;
+    invitationToken?: string;
     ownerEmail?: string;
   } | null>(null);
 
@@ -119,7 +119,7 @@ export default function OnboardOrganizationPage() {
       setSuccessData({
         organizationId: result.organizationId,
         loginUrl: result.loginUrl ?? "https://admin.bloom.ie/login",
-        temporaryPassword: result.temporaryPassword ?? values.temporaryPassword,
+        invitationToken: result.invitationToken,
         ownerEmail: result.ownerEmail ?? values.ownerEmail,
       });
     } catch (error) {
@@ -137,21 +137,21 @@ export default function OnboardOrganizationPage() {
         <div>
           <h2 className="text-3xl font-semibold text-white">Organization Created</h2>
           <p className="mt-2 text-sm text-slate-400">
-            Share the credentials below with the organization owner.
+            Share the invite token below with the organization owner to complete setup.
           </p>
         </div>
         <Card className="space-y-4">
           <div className="text-sm text-slate-300">Login URL: {successData.loginUrl}</div>
           <div className="text-sm text-slate-300">Owner Email: {successData.ownerEmail}</div>
           <div className="text-sm text-slate-300">
-            Temporary Password: {successData.temporaryPassword}
+            Invitation Token: {successData.invitationToken ?? "—"}
           </div>
           <div className="flex flex-wrap gap-3">
             <Button
               type="button"
               onClick={() => {
                 void navigator.clipboard.writeText(
-                  `Login URL: ${successData.loginUrl}\nEmail: ${successData.ownerEmail}\nTemporary Password: ${successData.temporaryPassword}`
+                  `Login URL: ${successData.loginUrl}\nEmail: ${successData.ownerEmail}\nInvitation Token: ${successData.invitationToken ?? ""}`
                 );
               }}
             >

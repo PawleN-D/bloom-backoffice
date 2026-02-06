@@ -3,19 +3,37 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import Card from "@/components/Card";
 import HealthScore from "@/components/HealthScore";
 import OrganizationActions from "@/components/OrganizationActions";
 import PlanBadge from "@/components/PlanBadge";
 import StatusBadge from "@/components/StatusBadge";
 import { organizationSummaries } from "@/data/mock";
-import { fetchOrganization, impersonateOrganization } from "@/lib/api/organizations";
-import type { OrganizationSummary } from "@/types";
+import {
+  fetchOrganization,
+  fetchOrganizationActivity,
+  fetchOrganizationSubscription,
+  fetchOrganizationTickets,
+  fetchOrganizationUsers,
+} from "@/lib/api/organizations";
+import type {
+  OrganizationActivity,
+  OrganizationSummary,
+  OrganizationUser,
+  SubscriptionSummary,
+  SupportTicketSummary,
+} from "@/types";
 
 const tabs = ["Overview", "Subscription", "Users", "Activity", "Support"] as const;
 
 type Tab = (typeof tabs)[number];
+
+type TabState = {
+  loading: boolean;
+  error: string | null;
+  loaded: boolean;
+};
 
 function formatDate(value: string | null) {
   if (!value) return "—";
@@ -24,15 +42,49 @@ function formatDate(value: string | null) {
   return format(date, "MMM d, yyyy");
 }
 
+function formatRelative(value: string | null) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return formatDistanceToNow(date, { addSuffix: true });
+}
+
 export default function OrganizationDetailPage() {
   const params = useParams();
   const id = String(params.id);
   const [activeTab, setActiveTab] = useState<Tab>("Overview");
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [organization, setOrganization] = useState<OrganizationSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [usingSample, setUsingSample] = useState(false);
+
+  const [subscription, setSubscription] = useState<SubscriptionSummary | null>(null);
+  const [users, setUsers] = useState<OrganizationUser[]>([]);
+  const [activity, setActivity] = useState<OrganizationActivity[]>([]);
+  const [tickets, setTickets] = useState<SupportTicketSummary[]>([]);
+
+  const [tabState, setTabState] = useState<Record<Tab, TabState>>({
+    Overview: { loading: false, error: null, loaded: true },
+    Subscription: { loading: false, error: null, loaded: false },
+    Users: { loading: false, error: null, loaded: false },
+    Activity: { loading: false, error: null, loaded: false },
+    Support: { loading: false, error: null, loaded: false },
+  });
+
+  useEffect(() => {
+    setActiveTab("Overview");
+    setSubscription(null);
+    setUsers([]);
+    setActivity([]);
+    setTickets([]);
+    setTabState({
+      Overview: { loading: false, error: null, loaded: true },
+      Subscription: { loading: false, error: null, loaded: false },
+      Users: { loading: false, error: null, loaded: false },
+      Activity: { loading: false, error: null, loaded: false },
+      Support: { loading: false, error: null, loaded: false },
+    });
+  }, [id]);
 
   useEffect(() => {
     let isMounted = true;
@@ -59,6 +111,53 @@ export default function OrganizationDetailPage() {
       isMounted = false;
     };
   }, [id]);
+
+  useEffect(() => {
+    const current = tabState[activeTab];
+    if (current.loaded || current.loading || activeTab === "Overview") {
+      return;
+    }
+
+    const loadTab = async () => {
+      setTabState((prev) => ({
+        ...prev,
+        [activeTab]: { ...prev[activeTab], loading: true, error: null },
+      }));
+      try {
+        if (activeTab === "Subscription") {
+          const data = await fetchOrganizationSubscription(id);
+          setSubscription(data);
+        }
+        if (activeTab === "Users") {
+          const data = await fetchOrganizationUsers(id);
+          setUsers(data);
+        }
+        if (activeTab === "Activity") {
+          const data = await fetchOrganizationActivity(id);
+          setActivity(data);
+        }
+        if (activeTab === "Support") {
+          const data = await fetchOrganizationTickets(id);
+          setTickets(data);
+        }
+        setTabState((prev) => ({
+          ...prev,
+          [activeTab]: { loading: false, error: null, loaded: true },
+        }));
+      } catch {
+        setTabState((prev) => ({
+          ...prev,
+          [activeTab]: {
+            loading: false,
+            error: "Unable to load tab data. Check API connectivity.",
+            loaded: true,
+          },
+        }));
+      }
+    };
+
+    void loadTab();
+  }, [activeTab, id, tabState]);
 
   const handleRetry = () => {
     setIsLoading(true);
@@ -93,26 +192,6 @@ export default function OrganizationDetailPage() {
       ...organization,
       status: organization.status === "SUSPENDED" ? "ACTIVE" : "SUSPENDED",
     });
-  };
-
-  const handleImpersonate = async () => {
-    if (!organization) return;
-    setActionMessage(null);
-    try {
-      const response = await impersonateOrganization(organization.id);
-      if (response.url) {
-        window.open(response.url, "_blank", "noopener,noreferrer");
-        setActionMessage("Impersonation session opened in a new tab.");
-        return;
-      }
-      if (response.token) {
-        setActionMessage("Impersonation token issued. Connect to the Care app to use it.");
-        return;
-      }
-      setActionMessage("Impersonation request completed.");
-    } catch {
-      setActionMessage("Unable to impersonate. Check permissions or API status.");
-    }
   };
 
   if (isLoading) {
@@ -180,7 +259,6 @@ export default function OrganizationDetailPage() {
           <OrganizationActions
             organization={organization}
             onSuspendToggle={handleSuspendToggle}
-            onImpersonate={handleImpersonate}
             variant="button"
           />
         </div>
@@ -189,12 +267,6 @@ export default function OrganizationDetailPage() {
       {usingSample ? (
         <div className="rounded-lg border border-white/10 bg-slate-900/60 px-4 py-3 text-xs uppercase tracking-[0.3em] text-slate-500">
           Showing sample data
-        </div>
-      ) : null}
-
-      {actionMessage ? (
-        <div className="rounded-lg border border-white/10 bg-slate-900/60 px-4 py-3 text-sm text-slate-300">
-          {actionMessage}
         </div>
       ) : null}
 
@@ -257,26 +329,108 @@ export default function OrganizationDetailPage() {
       ) : null}
 
       {activeTab === "Subscription" ? (
-        <Card>
-          <p className="text-sm text-slate-300">Subscription details will render here.</p>
+        <Card className="space-y-4">
+          {tabState.Subscription.loading ? (
+            <p className="text-sm text-slate-300">Loading subscription...</p>
+          ) : tabState.Subscription.error ? (
+            <p className="text-sm text-danger-500">{tabState.Subscription.error}</p>
+          ) : subscription ? (
+            <div className="grid gap-3 text-sm text-slate-300">
+              <div>Plan: {subscription.plan}</div>
+              <div>Billing Cycle: {subscription.billingCycle}</div>
+              <div>Status: {subscription.status}</div>
+              <div>MRR: €{subscription.mrr}</div>
+              <div>Next Billing: {formatDate(subscription.nextBillingDate)}</div>
+              <div>Payment Status: {subscription.paymentStatus}</div>
+              <div>Trial Ends: {formatDate(subscription.trialEndsAt)}</div>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-400">No subscription data available.</p>
+          )}
         </Card>
       ) : null}
 
       {activeTab === "Users" ? (
-        <Card>
-          <p className="text-sm text-slate-300">User list and roles will render here.</p>
+        <Card className="space-y-4">
+          {tabState.Users.loading ? (
+            <p className="text-sm text-slate-300">Loading users...</p>
+          ) : tabState.Users.error ? (
+            <p className="text-sm text-danger-500">{tabState.Users.error}</p>
+          ) : users.length ? (
+            <div className="overflow-hidden rounded-lg border border-white/10">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-900/70 text-xs uppercase tracking-[0.3em] text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">Name</th>
+                    <th className="px-4 py-3">Email</th>
+                    <th className="px-4 py-3">Role</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Last Login</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/10">
+                  {users.map((user) => (
+                    <tr key={user.id}>
+                      <td className="px-4 py-3 text-slate-200">{user.name}</td>
+                      <td className="px-4 py-3 text-slate-300">{user.email}</td>
+                      <td className="px-4 py-3 text-slate-300">{user.role}</td>
+                      <td className="px-4 py-3 text-slate-300">{user.status}</td>
+                      <td className="px-4 py-3 text-slate-400">{formatRelative(user.lastLoginAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-400">No users found for this organization.</p>
+          )}
         </Card>
       ) : null}
 
       {activeTab === "Activity" ? (
-        <Card>
-          <p className="text-sm text-slate-300">Activity timeline will render here.</p>
+        <Card className="space-y-4">
+          {tabState.Activity.loading ? (
+            <p className="text-sm text-slate-300">Loading activity...</p>
+          ) : tabState.Activity.error ? (
+            <p className="text-sm text-danger-500">{tabState.Activity.error}</p>
+          ) : activity.length ? (
+            <div className="space-y-3">
+              {activity.map((item) => (
+                <div key={item.id} className="rounded-lg border border-white/10 bg-slate-900/60 px-4 py-3">
+                  <div className="text-sm text-slate-200">{item.message}</div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    {item.actor} • {formatRelative(item.timestamp)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-400">No activity recorded yet.</p>
+          )}
         </Card>
       ) : null}
 
       {activeTab === "Support" ? (
-        <Card>
-          <p className="text-sm text-slate-300">Support tickets for this org will render here.</p>
+        <Card className="space-y-4">
+          {tabState.Support.loading ? (
+            <p className="text-sm text-slate-300">Loading tickets...</p>
+          ) : tabState.Support.error ? (
+            <p className="text-sm text-danger-500">{tabState.Support.error}</p>
+          ) : tickets.length ? (
+            <div className="space-y-3">
+              {tickets.map((ticket) => (
+                <div key={ticket.id} className="rounded-lg border border-white/10 bg-slate-900/60 px-4 py-3">
+                  <div className="text-sm text-slate-200">{ticket.subject}</div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    Status: {ticket.status} • Priority: {ticket.priority} • {formatRelative(ticket.createdAt)}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">Assigned: {ticket.assignee}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-400">No support tickets found.</p>
+          )}
         </Card>
       ) : null}
     </div>

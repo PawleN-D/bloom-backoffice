@@ -31,6 +31,7 @@ function normalizeStatus(value: unknown): OrganizationStatus {
   const normalized = String(value ?? "").toUpperCase();
   if (normalized.includes("SUSPEND")) return "SUSPENDED";
   if (normalized.includes("TRIAL")) return "TRIAL";
+  if (normalized.includes("PAST")) return "ACTIVE";
   return "ACTIVE";
 }
 
@@ -81,18 +82,28 @@ export function toOrganizationSummary(raw: Record<string, unknown>): Organizatio
   const slug = normalizeSlug(raw.slug ?? raw.subdomain, name);
   const billingEmail = String(raw.billingEmail ?? raw.billing_email ?? raw.email ?? "");
 
+  const count = (raw as { _count?: Record<string, number> })._count ?? {};
+
   const usersUsed = normalizeNumber(
-    raw.usersUsed ?? raw.userCount ?? (raw.users as { used?: number } | undefined)?.used
+    raw.usersUsed ?? raw.userCount ?? count.users ?? (raw.users as { used?: number } | undefined)?.used
   );
   const usersLimit = normalizeNumber(
-    raw.usersLimit ?? raw.userLimit ?? (raw.users as { limit?: number } | undefined)?.limit ?? usersUsed
+    raw.usersLimit ??
+      raw.userLimit ??
+      raw.maxUsers ??
+      (raw.users as { limit?: number } | undefined)?.limit ??
+      usersUsed
   );
 
   const clientsUsed = normalizeNumber(
-    raw.clientsUsed ?? raw.clientCount ?? (raw.clients as { used?: number } | undefined)?.used
+    raw.clientsUsed ?? raw.clientCount ?? count.clients ?? (raw.clients as { used?: number } | undefined)?.used
   );
   const clientsLimit = normalizeNumber(
-    raw.clientsLimit ?? raw.clientLimit ?? (raw.clients as { limit?: number } | undefined)?.limit ?? clientsUsed
+    raw.clientsLimit ??
+      raw.clientLimit ??
+      raw.maxClients ??
+      (raw.clients as { limit?: number } | undefined)?.limit ??
+      clientsUsed
   );
 
   return {
@@ -101,7 +112,13 @@ export function toOrganizationSummary(raw: Record<string, unknown>): Organizatio
     slug,
     billingEmail,
     plan: normalizePlan(raw.plan ?? raw.subscriptionPlan ?? raw.tier ?? "STARTER"),
-    status: normalizeStatus(raw.status ?? raw.accessStatus ?? raw.state ?? "ACTIVE"),
+    status: normalizeStatus(
+      raw.subscriptionStatus ??
+        raw.status ??
+        raw.accessStatus ??
+        raw.state ??
+        (raw.suspended ? "SUSPENDED" : "ACTIVE")
+    ),
     usersUsed,
     usersLimit,
     clientsUsed,
@@ -118,12 +135,13 @@ export function toOrganizationSummary(raw: Record<string, unknown>): Organizatio
 }
 
 export async function fetchOrganizations(): Promise<OrganizationSummary[]> {
-  const response = await apiClient.get<OrganizationsResponse>("/api/backoffice/organizations");
-  const payload = response.data;
-  const data = Array.isArray((payload as { data?: unknown[] })?.data)
-    ? (payload as { data: unknown[] }).data
-    : Array.isArray(payload)
-    ? payload
+  const response = await apiClient.get<OrganizationsResponse>("/api/admin/organizations");
+  const payload = response.data as { data?: unknown } | unknown;
+  const raw = (payload as { data?: unknown })?.data ?? payload;
+  const data = Array.isArray(raw)
+    ? raw
+    : Array.isArray((raw as { organizations?: unknown[] })?.organizations)
+    ? (raw as { organizations: unknown[] }).organizations
     : [];
 
   return data.map((item) => toOrganizationSummary(item as Record<string, unknown>));
@@ -131,7 +149,7 @@ export async function fetchOrganizations(): Promise<OrganizationSummary[]> {
 
 export async function fetchOrganization(id: string): Promise<OrganizationSummary> {
   const response = await apiClient.get<ApiPayload<unknown>>(
-    `/api/backoffice/organizations/${id}`
+    `/api/admin/organizations/${id}`
   );
   const payload = response.data as { data?: unknown };
   const raw = payload?.data ?? response.data;
@@ -142,9 +160,7 @@ export async function fetchOrganization(id: string): Promise<OrganizationSummary
 }
 
 export async function fetchOrganizationSubscription(id: string): Promise<SubscriptionSummary | null> {
-  const response = await apiClient.get<ApiPayload<unknown>>(
-    `/api/backoffice/organizations/${id}/subscription`
-  );
+  const response = await apiClient.get<ApiPayload<unknown>>(`/api/hq/subscriptions/${id}`);
   const payload = response.data as { data?: unknown };
   const raw = payload?.data ?? response.data;
   if (!raw || typeof raw !== "object") {
@@ -153,49 +169,60 @@ export async function fetchOrganizationSubscription(id: string): Promise<Subscri
 
   const record = raw as Record<string, unknown>;
   return {
-    plan: normalizePlan(record.plan ?? record.tier ?? record.subscriptionPlan ?? "STARTER"),
+    plan: normalizePlan(record.plan ?? record.subscriptionPlan ?? record.tier ?? "STARTER"),
     billingCycle: normalizeString(record.billingCycle ?? record.cycle ?? "MONTHLY"),
-    status: normalizeString(record.status ?? record.state ?? "ACTIVE"),
+    status: normalizeString(record.status ?? record.subscriptionStatus ?? record.state ?? "ACTIVE"),
     mrr: normalizeNumber(record.mrr ?? record.monthlyRecurringRevenue ?? 0),
-    nextBillingDate: normalizeIsoDate(record.nextBillingDate ?? record.nextInvoiceAt),
+    nextBillingDate: normalizeIsoDate(
+      record.nextBillingDate ?? record.nextInvoiceDate ?? record.renewalDate
+    ),
     paymentStatus: normalizeString(record.paymentStatus ?? record.payment_state ?? "—"),
     trialEndsAt: normalizeIsoDate(record.trialEndsAt ?? record.trialEndDate),
   };
 }
 
 export async function fetchOrganizationUsers(id: string): Promise<OrganizationUser[]> {
-  const response = await apiClient.get<ApiPayload<unknown[]>>(
-    `/api/backoffice/organizations/${id}/users`
+  const response = await apiClient.get<ApiPayload<unknown>>(
+    `/api/admin/organizations/${id}`
   );
-  const payload = response.data as { data?: unknown[] };
+  const payload = response.data as { data?: unknown };
   const raw = payload?.data ?? response.data;
-  return normalizeArray<Record<string, unknown>>(raw).map((user) => ({
+  const users = normalizeArray<Record<string, unknown>>(
+    (raw as { users?: unknown[] })?.users ?? []
+  );
+
+  return users.map((user) => ({
     id: String(user.id ?? user._id ?? user.email ?? "user"),
-    name: normalizeString(user.name ?? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim(), "—"),
+    name: normalizeString(
+      user.name ?? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim(),
+      "—"
+    ),
     email: normalizeString(user.email, "—"),
     role: normalizeString(user.role ?? user.permission ?? "—"),
     status: normalizeString(user.status ?? user.state ?? "—"),
-    lastLoginAt: normalizeIsoDate(user.lastLoginAt ?? user.lastActiveAt ?? user.updatedAt),
+    lastLoginAt: null,
   }));
 }
 
 export async function fetchOrganizationActivity(id: string): Promise<OrganizationActivity[]> {
   const response = await apiClient.get<ApiPayload<unknown[]>>(
-    `/api/backoffice/organizations/${id}/activity`
+    `/api/hq/security-logs?organizationId=${id}`
   );
   const payload = response.data as { data?: unknown[] };
   const raw = payload?.data ?? response.data;
   return normalizeArray<Record<string, unknown>>(raw).map((item) => ({
     id: String(item.id ?? item._id ?? Math.random().toString(36).slice(2)),
-    message: normalizeString(item.message ?? item.action ?? "Activity updated"),
-    actor: normalizeString(item.actor ?? item.performedBy ?? item.adminName ?? "—"),
-    timestamp: normalizeIsoDate(item.timestamp ?? item.createdAt ?? item.time) ?? "",
+    message: normalizeString(item.action ?? item.message ?? "Activity updated"),
+    actor: normalizeString(
+      (item.user as { email?: string } | undefined)?.email ?? item.actor ?? "—"
+    ),
+    timestamp: normalizeIsoDate(item.createdAt ?? item.timestamp ?? item.time) ?? "",
   }));
 }
 
 export async function fetchOrganizationTickets(id: string): Promise<SupportTicketSummary[]> {
   const response = await apiClient.get<ApiPayload<unknown[]>>(
-    `/api/backoffice/organizations/${id}/tickets`
+    `/api/hq/support/tickets?organizationId=${id}`
   );
   const payload = response.data as { data?: unknown[] };
   const raw = payload?.data ?? response.data;
@@ -205,13 +232,12 @@ export async function fetchOrganizationTickets(id: string): Promise<SupportTicke
     status: normalizeString(ticket.status ?? ticket.state ?? "—"),
     priority: normalizeString(ticket.priority ?? "—"),
     createdAt: normalizeIsoDate(ticket.createdAt ?? ticket.openedAt),
-    assignee: normalizeString(ticket.assignedTo ?? ticket.assignee ?? "Unassigned"),
+    assignee: normalizeString(
+      (ticket.assignedTo as { email?: string } | undefined)?.email ?? ticket.assignee ?? "Unassigned"
+    ),
   }));
 }
 
 export async function impersonateOrganization(id: string): Promise<ImpersonationResponse> {
-  const response = await apiClient.post<ImpersonationResponse>(
-    `/api/backoffice/organizations/${id}/impersonate`
-  );
-  return response.data;
+  throw new Error(`Impersonation not available for organization ${id}.`);
 }

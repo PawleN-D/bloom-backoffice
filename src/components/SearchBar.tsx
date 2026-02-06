@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import Input from "@/components/Input";
+import { Input } from "@/components/ui/input";
 
 export default function SearchBar({
   value,
