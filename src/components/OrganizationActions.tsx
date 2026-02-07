@@ -7,10 +7,18 @@ import type { OrganizationSummary } from "@/types";
 export default function OrganizationActions({
   organization,
   onSuspendToggle,
+  permissions,
   variant = "icon",
 }: {
   organization: OrganizationSummary;
   onSuspendToggle: (id: string) => void;
+  permissions?: {
+    canEdit?: boolean;
+    canSuspend?: boolean;
+    canViewSubscription?: boolean;
+    canViewActivity?: boolean;
+    canDelete?: boolean;
+  };
   variant?: "icon" | "button";
 }) {
   const router = useRouter();
@@ -32,6 +40,18 @@ export default function OrganizationActions({
     action();
     setOpen(false);
   };
+
+  const canEdit = permissions?.canEdit ?? true;
+  const canSuspend = permissions?.canSuspend ?? true;
+  const canViewSubscription = permissions?.canViewSubscription ?? true;
+  const canViewActivity = permissions?.canViewActivity ?? true;
+  const canDelete = permissions?.canDelete ?? true;
+
+  const hasActions = canEdit || canSuspend || canViewSubscription || canViewActivity || canDelete;
+
+  if (!hasActions) {
+    return null;
+  }
 
   return (
     <div ref={containerRef} className="relative" onClick={(event) => event.stopPropagation()}>
@@ -55,49 +75,59 @@ export default function OrganizationActions({
           >
             View Details
           </button>
-          <button
-            type="button"
-            className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-200 hover:bg-slate-900/60"
-            onClick={() =>
-              handleAction(() => router.push(`/organizations/${organization.id}?mode=edit`))
-            }
-          >
-            Edit Organization
-          </button>
-          <button
-            type="button"
-            className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-200 hover:bg-slate-900/60"
-            onClick={() => handleAction(() => router.push(`/subscriptions/${organization.id}`))}
-          >
-            View Subscription
-          </button>
-          <button
-            type="button"
-            className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-200 hover:bg-slate-900/60"
-            onClick={() => handleAction(() => router.push(`/activity?org=${organization.id}`))}
-          >
-            View Activity Log
-          </button>
-          <button
-            type="button"
-            className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-200 hover:bg-slate-900/60"
-            onClick={() => handleAction(() => onSuspendToggle(organization.id))}
-          >
-            {organization.status === "SUSPENDED" ? "Unsuspend" : "Suspend"}
-          </button>
-          <button
-            type="button"
-            className="w-full rounded-lg px-3 py-2 text-left text-sm text-danger-500 hover:bg-slate-900/60"
-            onClick={() =>
-              handleAction(() => {
-                if (window.confirm("Soft delete this organization?")) {
-                  onSuspendToggle(organization.id);
-                }
-              })
-            }
-          >
-            Delete (Soft)
-          </button>
+          {canEdit ? (
+            <button
+              type="button"
+              className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-200 hover:bg-slate-900/60"
+              onClick={() =>
+                handleAction(() => router.push(`/organizations/${organization.id}?mode=edit`))
+              }
+            >
+              Edit Organization
+            </button>
+          ) : null}
+          {canViewSubscription ? (
+            <button
+              type="button"
+              className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-200 hover:bg-slate-900/60"
+              onClick={() => handleAction(() => router.push(`/subscriptions/${organization.id}`))}
+            >
+              View Subscription
+            </button>
+          ) : null}
+          {canViewActivity ? (
+            <button
+              type="button"
+              className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-200 hover:bg-slate-900/60"
+              onClick={() => handleAction(() => router.push(`/activity?org=${organization.id}`))}
+            >
+              View Activity Log
+            </button>
+          ) : null}
+          {canSuspend ? (
+            <button
+              type="button"
+              className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-200 hover:bg-slate-900/60"
+              onClick={() => handleAction(() => onSuspendToggle(organization.id))}
+            >
+              {organization.status === "SUSPENDED" ? "Unsuspend" : "Suspend"}
+            </button>
+          ) : null}
+          {canDelete ? (
+            <button
+              type="button"
+              className="w-full rounded-lg px-3 py-2 text-left text-sm text-danger-500 hover:bg-slate-900/60"
+              onClick={() =>
+                handleAction(() => {
+                  if (window.confirm("Soft delete this organization?")) {
+                    onSuspendToggle(organization.id);
+                  }
+                })
+              }
+            >
+              Delete (Soft)
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>
