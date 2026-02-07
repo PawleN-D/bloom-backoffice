@@ -23,7 +23,9 @@ export default function OrganizationActions({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [openUpwards, setOpenUpwards] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -34,6 +36,20 @@ export default function OrganizationActions({
     };
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const frame = window.requestAnimationFrame(() => {
+      const container = containerRef.current;
+      const menu = menuRef.current;
+      if (!container || !menu) return;
+      const containerRect = container.getBoundingClientRect();
+      const menuHeight = menu.offsetHeight;
+      const spaceBelow = window.innerHeight - containerRect.bottom;
+      setOpenUpwards(spaceBelow < menuHeight + 16);
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [open]);
 
   const handleAction = (action: () => void) => {
@@ -67,7 +83,12 @@ export default function OrganizationActions({
         {variant === "icon" ? "•••" : "Actions"}
       </button>
       {open ? (
-        <div className="absolute right-0 z-20 mt-2 w-56 rounded-xl border border-white/10 bg-slate-950/95 p-2 shadow-lg">
+        <div
+          ref={menuRef}
+          className={`absolute right-0 z-20 w-56 rounded-xl border border-white/10 bg-slate-950/95 p-2 shadow-lg ${
+            openUpwards ? "bottom-full mb-2" : "top-full mt-2"
+          }`}
+        >
           <button
             type="button"
             className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-200 hover:bg-slate-900/60"

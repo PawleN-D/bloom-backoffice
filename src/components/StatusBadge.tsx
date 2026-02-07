@@ -7,6 +7,7 @@ const variants: Record<string, Parameters<typeof Badge>[0]["variant"]> = {
   PAST_DUE: "warning",
   CANCELLED: "neutral",
   CANCELED: "neutral",
+  PENDING: "warning",
   OPEN: "info",
   IN_PROGRESS: "warning",
   RESOLVED: "success",
