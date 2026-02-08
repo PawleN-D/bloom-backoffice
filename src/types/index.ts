@@ -41,6 +41,7 @@ export type AuthSessionResponse = {
 
 export type AuthSessionStatus = {
   authenticated: boolean;
+  user?: BackOfficeUser;
 };
 
 export type OrganizationPlan = "FREE" | "STARTER" | "PROFESSIONAL" | "ENTERPRISE";
