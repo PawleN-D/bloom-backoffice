@@ -13,6 +13,13 @@ export type PlanOverrideFlag = {
   label: string;
   description: string;
   enabled: boolean;
+  availableInPlans?: OrganizationPlan[];
+  defaultEnabled?: boolean;
+  isInPlan?: boolean;
+  isOverridden?: boolean;
+  category?: string;
+  betaFeature?: boolean;
+  comingSoon?: boolean;
 };
 
 export type BackOfficeUser = {
@@ -34,6 +41,7 @@ export type AuthSessionResponse = {
 
 export type AuthSessionStatus = {
   authenticated: boolean;
+  user?: BackOfficeUser;
 };
 
 export type OrganizationPlan = "FREE" | "STARTER" | "PROFESSIONAL" | "ENTERPRISE";
@@ -74,6 +82,7 @@ export type OrganizationUser = {
   email: string;
   role: string;
   status: string;
+  isActive: boolean;
   lastLoginAt: string | null;
 };
 
@@ -91,4 +100,37 @@ export type SupportTicketSummary = {
   priority: string;
   createdAt: string | null;
   assignee: string;
+};
+
+export type FeatureSummary = {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  category: string;
+  availableInPlans: OrganizationPlan[];
+  betaFeature: boolean;
+  comingSoon: boolean;
+  defaultEnabled: boolean;
+};
+
+export type SubscriptionRow = {
+  organizationId: string;
+  organizationName: string;
+  plan: OrganizationPlan;
+  status: string;
+  billingCycle: string;
+  mrr: number;
+  nextBillingDate: string | null;
+  paymentStatus: string;
+  trialEndsAt: string | null;
+};
+
+export type InvoiceSummary = {
+  id: string;
+  issuedAt: string | null;
+  dueAt: string | null;
+  status: string;
+  totalCents: number;
+  currency: string;
 };

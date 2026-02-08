@@ -20,7 +20,9 @@ import PlanBadge from "@/components/PlanBadge";
 import SearchBar from "@/components/SearchBar";
 import StatusBadge from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { fetchOrganizations } from "@/lib/api/organizations";
+import { fetchOrganizations, suspendOrganization, unsuspendOrganization } from "@/lib/api/organizations";
+import { useAuth } from "@/contexts/AuthContext";
+import { hasPermission } from "@/lib/rbac";
 import { getOrganizationUrl } from "@/lib/utils/subdomain";
 import type { OrganizationSummary } from "@/types";
 
@@ -61,6 +63,7 @@ function formatRelativeDate(value: string | null) {
 
 export default function OrganizationsPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [rows, setRows] = useState<OrganizationSummary[]>([]);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -145,15 +148,36 @@ export default function OrganizationsPage() {
     });
   }, [rows, search, planFilter, statusFilter, healthFilter]);
 
-  const handleSuspendToggle = useCallback((id: string) => {
-    setRows((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? { ...item, status: item.status === "SUSPENDED" ? "ACTIVE" : "SUSPENDED" }
-          : item
-      )
-    );
-  }, []);
+  const canCreateOrg = hasPermission(user, "org.create");
+  const canManageOrg = hasPermission(user, "org.manage");
+  const canViewSubscription = hasPermission(user, "subscription.view");
+  const canViewActivity = hasPermission(user, "analytics.view");
+
+  const handleSuspendToggle = useCallback(
+    async (id: string) => {
+      if (!canManageOrg) return;
+      const target = rows.find((item) => item.id === id);
+      if (!target) return;
+      const isSuspended = target.status === "SUSPENDED";
+      try {
+        if (isSuspended) {
+          await unsuspendOrganization(id);
+        } else {
+          await suspendOrganization(id);
+        }
+        setRows((prev) =>
+          prev.map((item) =>
+            item.id === id
+              ? { ...item, status: isSuspended ? "ACTIVE" : "SUSPENDED" }
+              : item
+          )
+        );
+      } catch {
+        setError("Unable to update organization status. Please try again.");
+      }
+    },
+    [canManageOrg, rows]
+  );
 
   const columns = useMemo<ColumnDef<OrganizationSummary>[]>(
     () => [
@@ -269,11 +293,18 @@ export default function OrganizationsPage() {
           <OrganizationActions
             organization={row.original}
             onSuspendToggle={handleSuspendToggle}
+            permissions={{
+              canEdit: canManageOrg,
+              canSuspend: canManageOrg,
+              canDelete: canManageOrg,
+              canViewSubscription,
+              canViewActivity,
+            }}
           />
         ),
       },
     ],
-    [handleSuspendToggle]
+    [handleSuspendToggle, canManageOrg, canViewSubscription, canViewActivity]
   );
 
   const table = useReactTable({
@@ -299,10 +330,18 @@ export default function OrganizationsPage() {
     if (selectedIds.length === 0) {
       return;
     }
-    setRows((prev) =>
-      prev.map((row) => (selectedIds.includes(row.id) ? { ...row, status: "SUSPENDED" } : row))
-    );
-    setRowSelection({});
+    if (!canManageOrg) return;
+    Promise.allSettled(selectedIds.map((id) => suspendOrganization(id)))
+      .then((results) => {
+        const hasFailure = results.some((result) => result.status === "rejected");
+        setRows((prev) =>
+          prev.map((row) => (selectedIds.includes(row.id) ? { ...row, status: "SUSPENDED" } : row))
+        );
+        setRowSelection({});
+        if (hasFailure) {
+          setError("Some organizations could not be suspended.");
+        }
+      });
   };
 
   const handleExportCsv = () => {
@@ -351,9 +390,11 @@ export default function OrganizationsPage() {
           <div className="rounded-full border border-white/10 bg-slate-900/70 px-4 py-2 text-xs uppercase tracking-[0.3em] text-slate-400">
             Active: {activeCount}
           </div>
-          <Link href="/organizations/new">
-            <Button>New Organization</Button>
-          </Link>
+          {canCreateOrg ? (
+            <Link href="/organizations/new">
+              <Button>New Organization</Button>
+            </Link>
+          ) : null}
         </div>
       </div>
 
@@ -406,7 +447,8 @@ export default function OrganizationsPage() {
             <Button
               variant="destructive"
               onClick={handleSuspendSelected}
-              disabled={selectedIds.length === 0}
+              disabled={selectedIds.length === 0 || !canManageOrg}
+              title={canManageOrg ? "" : "Insufficient permissions"}
             >
               Suspend Selected
             </Button>

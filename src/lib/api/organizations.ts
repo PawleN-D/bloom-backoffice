@@ -10,6 +10,7 @@ import type {
   PlanOverrideFlag,
 } from "@/types";
 import { getOrganizationUrl, isValidSubdomain } from "@/lib/utils/subdomain";
+import { fetchFeatures } from "@/lib/api/features";
 
 type OrganizationsResponse = { data?: unknown[] } | unknown[];
 
@@ -233,13 +234,11 @@ export async function fetchOrganizationSubscription(id: string): Promise<Subscri
 
 export async function fetchOrganizationUsers(id: string): Promise<OrganizationUser[]> {
   const response = await apiClient.get<ApiPayload<unknown>>(
-    `/api/admin/organizations/${id}`
+    `/api/admin/organizations/${id}/users`
   );
   const payload = response.data as { data?: unknown };
   const raw = payload?.data ?? response.data;
-  const users = normalizeArray<Record<string, unknown>>(
-    (raw as { users?: unknown[] })?.users ?? []
-  );
+  const users = normalizeArray<Record<string, unknown>>(raw);
 
   return users.map((user) => ({
     id: String(user.id ?? user._id ?? user.email ?? "user"),
@@ -250,8 +249,69 @@ export async function fetchOrganizationUsers(id: string): Promise<OrganizationUs
     email: normalizeString(user.email, "-"),
     role: normalizeString(user.role ?? user.permission ?? "-"),
     status: normalizeString(user.status ?? user.state ?? "-"),
+    isActive: Boolean(user.isActive ?? user.active ?? false),
     lastLoginAt: null,
   }));
+}
+
+export async function createOrganizationUser(
+  id: string,
+  payload: { email: string; firstName?: string; lastName?: string; role?: string }
+): Promise<{ user: OrganizationUser; invitationToken?: string }> {
+  const response = await apiClient.post<ApiPayload<unknown>>(
+    `/api/admin/organizations/${id}/users`,
+    payload
+  );
+  const data = (response.data as { data?: any })?.data ?? response.data;
+  const record = data?.user ?? data ?? {};
+  const invitationToken = data?.invitationToken ?? record?.invitationToken;
+
+  const user: OrganizationUser = {
+    id: String(record.id ?? record._id ?? record.email ?? "user"),
+    name: normalizeString(
+      record.name ?? `${record.firstName ?? ""} ${record.lastName ?? ""}`.trim(),
+      "-"
+    ),
+    email: normalizeString(record.email, "-"),
+    role: normalizeString(record.role ?? "-"),
+    status: normalizeString(record.status ?? "-"),
+    isActive: Boolean(record.isActive ?? record.active ?? false),
+    lastLoginAt: null,
+  };
+
+  return { user, invitationToken };
+}
+
+export async function updateOrganizationUserRole(
+  id: string,
+  userId: string,
+  role: string
+): Promise<OrganizationUser> {
+  const response = await apiClient.put<ApiPayload<unknown>>(
+    `/api/admin/organizations/${id}/users/${userId}/role`,
+    { role }
+  );
+  const record = (response.data as { data?: any })?.data ?? response.data ?? {};
+  return {
+    id: String(record.id ?? userId),
+    name: normalizeString(
+      record.name ?? `${record.firstName ?? ""} ${record.lastName ?? ""}`.trim(),
+      "-"
+    ),
+    email: normalizeString(record.email, "-"),
+    role: normalizeString(record.role ?? role),
+    status: normalizeString(record.status ?? "-"),
+    isActive: Boolean(record.isActive ?? record.active ?? false),
+    lastLoginAt: null,
+  };
+}
+
+export async function deactivateOrganizationUser(id: string, userId: string) {
+  await apiClient.delete(`/api/admin/organizations/${id}/users/${userId}`);
+}
+
+export async function reactivateOrganizationUser(id: string, userId: string) {
+  await apiClient.post(`/api/admin/organizations/${id}/users/${userId}/reactivate`);
 }
 
 export async function fetchOrganizationActivity(id: string): Promise<OrganizationActivity[]> {
@@ -291,11 +351,13 @@ export async function fetchOrganizationTickets(id: string): Promise<SupportTicke
 export async function fetchOrganizationFeatures(
   id: string
 ): Promise<{ plan: OrganizationPlan | null; flags: PlanOverrideFlag[] }> {
-  const response = await apiClient.get<ApiPayload<unknown>>(
-    `/api/admin/organizations/${id}/features`
-  );
-  const payload = response.data as { data?: unknown };
-  const raw = payload?.data ?? response.data;
+  const [orgResponse, catalog] = await Promise.all([
+    apiClient.get<ApiPayload<unknown>>(`/api/admin/organizations/${id}/features`),
+    fetchFeatures(),
+  ]);
+
+  const payload = orgResponse.data as { data?: unknown };
+  const raw = payload?.data ?? orgResponse.data;
 
   if (!raw || typeof raw !== "object") {
     return { plan: null, flags: [] };
@@ -314,19 +376,54 @@ export async function fetchOrganizationFeatures(
       null
   );
 
-  const features = normalizeArray<Record<string, unknown>>(record.features ?? []);
-  const flags = features.map((item) => {
+  const overrides = normalizeArray<Record<string, unknown>>(record.features ?? []);
+  const overrideMap = new Map<string, { enabled: boolean }>();
+  overrides.forEach((item) => {
     const feature = (item.feature as Record<string, unknown> | undefined) ?? {};
     const key = String(feature.key ?? item.featureKey ?? item.id ?? "feature");
-    const label = normalizeString(feature.name ?? item.name ?? key);
-    const description = normalizeString(feature.description ?? item.description ?? "");
-    const enabled = Boolean(
-      item.enabled ?? (item as { isEnabled?: boolean }).isEnabled ?? feature.defaultEnabled ?? false
-    );
-    return { key, label, description, enabled };
+    const enabled = Boolean(item.enabled ?? (item as { isEnabled?: boolean }).isEnabled ?? false);
+    overrideMap.set(key, { enabled });
+  });
+
+  const flags = catalog.map((feature) => {
+    const inPlan = feature.availableInPlans.includes(plan);
+    const baselineEnabled = feature.defaultEnabled;
+    const override = overrideMap.get(feature.key);
+    const enabled = override ? override.enabled : baselineEnabled;
+    return {
+      key: feature.key,
+      label: feature.name,
+      description: feature.description ?? "",
+      enabled,
+      availableInPlans: feature.availableInPlans,
+      defaultEnabled: feature.defaultEnabled,
+      isInPlan: inPlan,
+      isOverridden: Boolean(override) && enabled !== baselineEnabled,
+      category: feature.category,
+      betaFeature: feature.betaFeature,
+      comingSoon: feature.comingSoon,
+    };
   });
 
   return { plan, flags };
+}
+
+export async function updateOrganizationFeatureOverride(
+  id: string,
+  featureKey: string,
+  enabled: boolean
+) {
+  await apiClient.post(`/api/admin/organizations/${id}/features/${featureKey}`, {
+    enabled,
+  });
+}
+
+export async function suspendOrganization(id: string) {
+  await apiClient.post(`/api/admin/organizations/${id}/suspend`);
+}
+
+export async function unsuspendOrganization(id: string) {
+  await apiClient.post(`/api/admin/organizations/${id}/unsuspend`);
 }
 
 export async function impersonateOrganization(id: string): Promise<ImpersonationResponse> {

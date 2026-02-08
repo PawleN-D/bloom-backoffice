@@ -10,6 +10,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { useAuth } from "@/contexts/AuthContext";
+import { hasPermission } from "@/lib/rbac";
 import { createOrganization } from "@/lib/api/onboarding";
 import { checkSubdomainAvailability } from "@/lib/api/organizations";
 import { onboardingSchema, type OnboardingFormValues } from "@/lib/schemas/validation";
@@ -55,6 +57,8 @@ function generatePassword() {
 }
 
 export default function OnboardOrganizationPage() {
+  const { user } = useAuth();
+  const canCreateOrg = hasPermission(user, "org.create");
   const [currentStep, setCurrentStep] = useState(0);
   const [slugTouched, setSlugTouched] = useState(false);
   const [customSubdomain, setCustomSubdomain] = useState(false);
@@ -200,6 +204,17 @@ export default function OnboardOrganizationPage() {
     const review = useMemo(() => getValues(), [currentStep, getValues]);
   const disableNext =
     currentStep === 0 && (checkingAvailability || subdomainAvailable !== true);
+
+  if (!canCreateOrg) {
+    return (
+      <Card className="space-y-3">
+        <h2 className="text-xl font-semibold text-white">Access Restricted</h2>
+        <p className="text-sm text-slate-400">
+          You do not have permission to create organizations. Contact an HQ administrator.
+        </p>
+      </Card>
+    );
+  }
 
   if (successData) {
     const organizationUrl = successData.organizationUrl;

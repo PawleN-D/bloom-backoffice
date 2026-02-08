@@ -4,12 +4,20 @@ import { useEffect, useMemo, useState } from "react";
 import Card from "@/components/Card";
 import Select from "@/components/Select";
 import Toggle from "@/components/Toggle";
-import { fetchOrganizationFeatures, fetchOrganizations } from "@/lib/api/organizations";
+import {
+  fetchOrganizationFeatures,
+  fetchOrganizations,
+  updateOrganizationFeatureOverride,
+} from "@/lib/api/organizations";
+import { useAuth } from "@/contexts/AuthContext";
+import { hasPermission } from "@/lib/rbac";
 import type { OrganizationSummary, PlanOverrideFlag } from "@/types";
 
 type LoadState = "idle" | "loading" | "error" | "ready";
 
 export default function PlanOverridesPage() {
+  const { user } = useAuth();
+  const canManageFeatures = hasPermission(user, "feature.manage");
   const [organizations, setOrganizations] = useState<OrganizationSummary[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState("");
   const [flags, setFlags] = useState<PlanOverrideFlag[]>([]);
@@ -78,6 +86,22 @@ export default function PlanOverridesPage() {
     [organizations, selectedOrgId]
   );
 
+  const handleToggle = async (flag: PlanOverrideFlag) => {
+    if (!selectedOrg || !canManageFeatures) return;
+    const nextEnabled = !flag.enabled;
+    setFlags((prev) =>
+      prev.map((item) => (item.key === flag.key ? { ...item, enabled: nextEnabled } : item))
+    );
+    try {
+      await updateOrganizationFeatureOverride(selectedOrg.id, flag.key, nextEnabled);
+    } catch {
+      setFlags((prev) =>
+        prev.map((item) => (item.key === flag.key ? { ...item, enabled: flag.enabled } : item))
+      );
+      setError("Unable to update feature override.");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -114,6 +138,12 @@ export default function PlanOverridesPage() {
           </div>
         ) : null}
 
+        {!canManageFeatures ? (
+          <div className="rounded-lg border border-white/10 bg-slate-900/70 px-4 py-3 text-sm text-slate-300">
+            Read-only access. Feature overrides require elevated permissions.
+          </div>
+        ) : null}
+
         {orgState === "loading" ? (
           <p className="text-sm text-slate-300">Loading organizations...</p>
         ) : null}
@@ -140,12 +170,15 @@ export default function PlanOverridesPage() {
                 <div className="flex items-center gap-3">
                   <Toggle
                     pressed={flag.enabled}
-                    disabled
-                    className="cursor-not-allowed opacity-60"
+                    disabled={!canManageFeatures}
+                    onClick={() => handleToggle(flag)}
                   />
                   <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
                     {flag.enabled ? "Enabled" : "Disabled"}
                   </span>
+                </div>
+                <div className="text-xs text-slate-500">
+                  {flag.isInPlan ? "Included in plan" : flag.defaultEnabled ? "Global default" : "Override"}
                 </div>
               </div>
             ))}

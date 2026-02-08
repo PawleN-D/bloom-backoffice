@@ -37,6 +37,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
         setHasSession(true);
+        if (response.data.user) {
+          setUser(response.data.user);
+        }
       } catch {
         clearStoredAuth();
         setUser(null);
