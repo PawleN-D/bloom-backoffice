@@ -26,6 +26,7 @@ import {
   suspendOrganization,
   unsuspendOrganization,
 } from "@/lib/api/organizations";
+import { getApiErrorDetails } from "@/lib/api/errors";
 import { getOrganizationUrl } from "@/lib/utils/subdomain";
 import type {
   OrganizationActivity,
@@ -95,6 +96,7 @@ export default function OrganizationDetailPage() {
     setTickets([]);
     setInviteToken(null);
     setUserActionError(null);
+    setUserActionDebug(null);
     setUserActionId(null);
     setUserForm({ email: "", firstName: "", lastName: "", role: "WORKER" });
     setTabState({
@@ -211,6 +213,10 @@ export default function OrganizationDetailPage() {
     role: "WORKER",
   });
   const [userActionError, setUserActionError] = useState<string | null>(null);
+  const [userActionDebug, setUserActionDebug] = useState<{
+    status?: number;
+    data?: unknown;
+  } | null>(null);
   const [userActionId, setUserActionId] = useState<string | null>(null);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
 
@@ -239,6 +245,7 @@ export default function OrganizationDetailPage() {
       return;
     }
     setUserActionError(null);
+    setUserActionDebug(null);
     setInviteToken(null);
     setUserActionId("invite");
     try {
@@ -251,8 +258,13 @@ export default function OrganizationDetailPage() {
       setUsers((prev) => [result.user, ...prev]);
       setInviteToken(result.invitationToken ?? null);
       setUserForm({ email: "", firstName: "", lastName: "", role: "WORKER" });
-    } catch {
-      setUserActionError("Unable to invite user. Check API connectivity.");
+    } catch (err) {
+      const details = getApiErrorDetails(
+        err,
+        "Unable to invite user. Check API connectivity."
+      );
+      setUserActionError(details.message);
+      setUserActionDebug({ status: details.status, data: details.data });
     } finally {
       setUserActionId(null);
     }
@@ -261,14 +273,17 @@ export default function OrganizationDetailPage() {
   const handleRoleChange = async (userId: string, role: string) => {
     if (!canManageUsers) return;
     setUserActionError(null);
+    setUserActionDebug(null);
     setUserActionId(userId);
     try {
       const updated = await updateOrganizationUserRole(id, userId, role);
       setUsers((prev) =>
         prev.map((user) => (user.id === userId ? { ...user, role: updated.role } : user))
       );
-    } catch {
-      setUserActionError("Unable to update user role.");
+    } catch (err) {
+      const details = getApiErrorDetails(err, "Unable to update user role.");
+      setUserActionError(details.message);
+      setUserActionDebug({ status: details.status, data: details.data });
     } finally {
       setUserActionId(null);
     }
@@ -277,14 +292,17 @@ export default function OrganizationDetailPage() {
   const handleDeactivate = async (userId: string) => {
     if (!canManageUsers) return;
     setUserActionError(null);
+    setUserActionDebug(null);
     setUserActionId(userId);
     try {
       await deactivateOrganizationUser(id, userId);
       setUsers((prev) =>
         prev.map((user) => (user.id === userId ? { ...user, isActive: false } : user))
       );
-    } catch {
-      setUserActionError("Unable to deactivate user.");
+    } catch (err) {
+      const details = getApiErrorDetails(err, "Unable to deactivate user.");
+      setUserActionError(details.message);
+      setUserActionDebug({ status: details.status, data: details.data });
     } finally {
       setUserActionId(null);
     }
@@ -293,14 +311,17 @@ export default function OrganizationDetailPage() {
   const handleReactivate = async (userId: string) => {
     if (!canManageUsers) return;
     setUserActionError(null);
+    setUserActionDebug(null);
     setUserActionId(userId);
     try {
       await reactivateOrganizationUser(id, userId);
       setUsers((prev) =>
         prev.map((user) => (user.id === userId ? { ...user, isActive: true } : user))
       );
-    } catch {
-      setUserActionError("Unable to reactivate user.");
+    } catch (err) {
+      const details = getApiErrorDetails(err, "Unable to reactivate user.");
+      setUserActionError(details.message);
+      setUserActionDebug({ status: details.status, data: details.data });
     } finally {
       setUserActionId(null);
     }
@@ -584,6 +605,17 @@ export default function OrganizationDetailPage() {
               {userActionError ? (
                 <div className="rounded-lg border border-danger-500/40 bg-danger-500/10 px-4 py-3 text-sm text-danger-500">
                   {userActionError}
+                  {userActionDebug ? (
+                    <div className="mt-2 text-xs text-slate-400">
+                      Debug:{" "}
+                      {userActionDebug.status ? `status ${userActionDebug.status}` : "status -"}
+                      {userActionDebug.data ? (
+                        <pre className="mt-2 max-h-32 overflow-auto rounded bg-slate-950/60 p-2 text-[11px] text-slate-300">
+                          {JSON.stringify(userActionDebug.data, null, 2)}
+                        </pre>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 
