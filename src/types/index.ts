@@ -28,6 +28,8 @@ export type BackOfficeUser = {
   firstName: string;
   lastName: string;
   role: "ADMIN" | "SUPPORT" | "BILLING" | "VIEWER" | "SUPER_ADMIN" | "MANAGER" | "ORG_OWNER" | "WORKER";
+  organizationId?: string | null;
+  globalAdmin?: boolean;
 };
 
 export type AuthResponse = {

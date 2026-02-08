@@ -45,8 +45,15 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   WORKER: ["org.view"],
 };
 
+export function isHqAdmin(user: BackOfficeUser | null): boolean {
+  if (!user) return false;
+  if (user.role === "SUPER_ADMIN") return true;
+  return user.role === "ADMIN" && !user.organizationId;
+}
+
 export function hasPermission(user: BackOfficeUser | null, permission: Permission): boolean {
   if (!user) return false;
+  if (!isHqAdmin(user)) return false;
   return ROLE_PERMISSIONS[user.role]?.includes(permission) ?? false;
 }
 
