@@ -86,6 +86,8 @@ export type OrganizationUser = {
   status: string;
   isActive: boolean;
   lastLoginAt: string | null;
+  createdAt?: string | null;
+  mustResetPw?: boolean;
 };
 
 export type OrganizationActivity = {
@@ -138,3 +140,5 @@ export type InvoiceSummary = {
 };
 
 export type { ImportedUser, ImportedUserRowError, ImportUserRole, User } from "@/types/models/user";
+export type { OrgRiskItem, OrgRiskMetrics, OrgRiskSummary, RiskIssueCode, RiskSeverity } from "@/types/models/risk";
+export type { EmailDeliveryStatus, EmailLog } from "@/types/models/email";

@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { apiClient } from "@/lib/apiClient";
+import { getApiErrorDetails } from "@/lib/api/errors";
 import type { ImportedUser } from "@/types/models/user";
 
 interface ImportResult {
@@ -65,31 +67,18 @@ export function useImportUsers(organizationId?: string) {
         setIsLoading(true);
         setError(null);
 
-        const response = await fetch(
+        const response = await apiClient.post<{ data?: unknown } | unknown>(
           `/api/hq/organizations/${targetOrganizationId}/users/bulk`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ users }),
-          }
+          { users }
         );
-
-        let body: unknown = null;
-        try {
-          body = await response.json();
-        } catch {
-          body = null;
-        }
-
-        if (!response.ok) {
-          throw new Error(parseErrorMessage(body, "Import failed."));
-        }
+        const body = (response.data as { data?: unknown })?.data ?? response.data;
 
         const nextResult = normalizeResult(body, users.length);
         setResult(nextResult);
         return nextResult;
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Import failed.";
+        const details = getApiErrorDetails(err, "Import failed.");
+        const message = parseErrorMessage(details.data, details.message);
         setError(message);
         return null;
       } finally {

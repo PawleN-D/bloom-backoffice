@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { apiClient } from "@/lib/apiClient";
+import { getApiErrorDetails } from "@/lib/api/errors";
 import type { OrganizationPlan } from "@/types";
 
 export type CreateOrgPayload = {
@@ -60,25 +62,11 @@ export function useCreateOrg() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/hq/organizations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      let body: unknown = null;
-      try {
-        body = await response.json();
-      } catch {
-        body = null;
-      }
-
-      if (!response.ok) {
-        const message = parseErrorMessage(body, "Unable to create organization.");
-        const nextError = { message, status: response.status };
-        setError(nextError);
-        throw nextError;
-      }
+      const response = await apiClient.post<{ data?: unknown } | unknown>(
+        "/api/hq/organizations",
+        payload
+      );
+      const body = (response.data as { data?: unknown })?.data ?? response.data;
 
       const id = resolveOrganizationId(body);
       if (!id) {
@@ -88,6 +76,12 @@ export function useCreateOrg() {
       }
 
       return { id, raw: body };
+    } catch (error) {
+      const details = getApiErrorDetails(error, "Unable to create organization.");
+      const message = parseErrorMessage(details.data, details.message);
+      const nextError = { message, status: details.status };
+      setError(nextError);
+      throw nextError;
     } finally {
       setIsLoading(false);
     }

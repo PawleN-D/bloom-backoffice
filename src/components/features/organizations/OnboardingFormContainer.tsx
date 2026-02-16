@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { OnboardingForm } from "@/components/organizations/OnboardingForm";
 import { OnboardingFormSkeleton } from "@/components/organizations/OnboardingFormSkeleton";
+import { fetchWelcomeEmailStatus } from "@/lib/api/emailLogs";
 import { useCreateOrg, type CreateOrgPayload } from "@/lib/hooks/api/useCreateOrg";
 import { useImportUsers } from "@/lib/hooks/api/useImportUsers";
 import { useDisclosure } from "@/lib/hooks/ui/useDisclosure";
@@ -211,6 +212,7 @@ export function OnboardingFormContainer() {
       });
 
       createdOrganizationId = organization.id;
+      const welcomeEmailStatus = await fetchWelcomeEmailStatus(organization.id);
 
       let importSummary: string | null = null;
       if (stagedUsers.length > 0) {
@@ -222,11 +224,19 @@ export function OnboardingFormContainer() {
         setImportResultSummary(importSummary);
       }
 
+      let emailMessage = "Organisation created!";
+      if (welcomeEmailStatus === "SENT") {
+        emailMessage = "Organisation created! Welcome email delivered.";
+      } else if (welcomeEmailStatus === "PENDING") {
+        emailMessage = "Organisation created! Welcome email is being sent...";
+      } else if (welcomeEmailStatus === "FAILED") {
+        emailMessage =
+          "Organisation created, but welcome email failed. Check the Communications page.";
+      }
+
       setToast({
-        message: importSummary
-          ? `Organisation created! Welcome email sent. ${importSummary}`
-          : "Organisation created! Welcome email sent.",
-        tone: "success",
+        message: importSummary ? `${emailMessage} ${importSummary}` : emailMessage,
+        tone: welcomeEmailStatus === "FAILED" ? "warning" : "success",
       });
       setTimeout(() => {
         router.push(`/organizations/${organization.id}`);
