@@ -15,14 +15,23 @@ export async function POST(request: Request) {
   }
 
   const requestPayload = await request.json();
-  const response = await fetch(`${SERVER_API_BASE_URL}/api/auth/login`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(requestPayload),
-    cache: "no-store",
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${SERVER_API_BASE_URL}/api/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestPayload),
+      cache: "no-store",
+    });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "Unknown network error";
+    return NextResponse.json(
+      { message: `Unable to reach auth API at ${SERVER_API_BASE_URL}. ${detail}` },
+      { status: 502 }
+    );
+  }
 
   if (!response.ok) {
     let message = "Invalid credentials.";

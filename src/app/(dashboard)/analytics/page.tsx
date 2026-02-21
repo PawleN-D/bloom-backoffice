@@ -1,13 +1,12 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Card from "@/components/Card";
 import StatCard from "@/components/StatCard";
 import PlanDistributionChart from "@/components/charts/PlanDistributionChart";
 import RevenueTrendChart from "@/components/charts/RevenueTrendChart";
 import SignupChurnChart from "@/components/charts/SignupChurnChart";
-import { AUTH_COOKIE_NAME } from "@/lib/authCookies";
-import { SERVER_API_BASE_URL } from "@/lib/config";
-import { cookies } from "next/headers";
-
-export const runtime = "edge";
+import { fetchAnalyticsPageData, type AnalyticsPageData } from "@/lib/api/analytics";
 
 const currencyFormatter = new Intl.NumberFormat("en-IE", {
   style: "currency",
@@ -15,136 +14,24 @@ const currencyFormatter = new Intl.NumberFormat("en-IE", {
   maximumFractionDigits: 0,
 });
 
-type PlatformStats = {
-  organizations: {
-    total: number;
-    active: number;
-    byPlan?: Record<string, number>;
-  };
-};
+export default function AnalyticsPage() {
+  const [data, setData] = useState<AnalyticsPageData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-type AnalyticsOverview = {
-  mrrCents: number;
-  arrCents: number;
-  churnRate: number;
-  newOrganizations?: number;
-  canceledSubscriptions?: number;
-};
-
-type AnalyticsData = {
-  mrr: number;
-  arr: number;
-  arpa: number;
-  ltv: number;
-  planDistribution: Array<{ name: string; value: number }>;
-  revenueTrend: Array<{ month: string; mrr: number }>;
-  signupChurn: Array<{ month: string; signups: number; churn: number }>;
-  churnMetrics: {
-    newOrgs: number;
-    churnedOrgs: number;
-    netGrowth: number;
-    churnRate: number;
-  };
-};
-
-async function getAnalyticsData(): Promise<AnalyticsData | null> {
-  if (!SERVER_API_BASE_URL) {
-    return null;
-  }
-
-  const cookieStore = await cookies();
-  const token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
-  if (!token) {
-    return null;
-  }
-
-  const requestHeaders = new Headers({
-    authorization: `Bearer ${token}`,
-  });
-
-  try {
-    const [statsResponse, analyticsResponse] = await Promise.all([
-      fetch(`${SERVER_API_BASE_URL}/api/admin/stats`, {
-        headers: requestHeaders,
-        cache: "no-store",
-      }),
-      fetch(`${SERVER_API_BASE_URL}/api/hq/analytics/overview`, {
-        headers: requestHeaders,
-        cache: "no-store",
-      }),
-    ]);
-
-    if (!statsResponse.ok || !analyticsResponse.ok) {
-      return null;
-    }
-
-    const statsPayload = (await statsResponse.json()) as { data?: PlatformStats };
-    const analyticsPayload = (await analyticsResponse.json()) as { data?: AnalyticsOverview };
-
-    const stats = statsPayload.data;
-    const analytics = analyticsPayload.data;
-
-    if (!stats || !analytics) {
-      return null;
-    }
-
-    const mrr = Math.round(analytics.mrrCents / 100);
-    const arr = Math.round(analytics.arrCents / 100);
-    const activeOrgs = stats.organizations.active || 0;
-    const arpa = activeOrgs > 0 ? Math.round(mrr / activeOrgs) : 0;
-    const ltv = arpa * 12;
-
-    const planDistribution = Object.entries(stats.organizations.byPlan ?? {}).map(
-      ([plan, value]) => ({
-        name: plan,
-        value,
-      })
-    );
-
-    const monthFormatter = new Intl.DateTimeFormat("en-US", { month: "short" });
-    const now = new Date();
-    const revenueTrend = Array.from({ length: 12 }).map((_, index) => {
-      const date = new Date(now.getFullYear(), now.getMonth() - (11 - index), 1);
-      return {
-        month: monthFormatter.format(date),
-        mrr,
-      };
-    });
-
-    const signups = analytics.newOrganizations ?? 0;
-    const churn = analytics.canceledSubscriptions ?? 0;
-    const signupChurn = Array.from({ length: 6 }).map((_, index) => {
-      const date = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1);
-      return {
-        month: monthFormatter.format(date),
-        signups: index === 5 ? signups : 0,
-        churn: index === 5 ? churn : 0,
-      };
-    });
-
-    return {
-      mrr,
-      arr,
-      arpa,
-      ltv,
-      planDistribution,
-      revenueTrend,
-      signupChurn,
-      churnMetrics: {
-        newOrgs: signups,
-        churnedOrgs: churn,
-        netGrowth: signups - churn,
-        churnRate: analytics.churnRate,
-      },
+  useEffect(() => {
+    let isMounted = true;
+    const load = async () => {
+      setIsLoading(true);
+      const nextData = await fetchAnalyticsPageData();
+      if (!isMounted) return;
+      setData(nextData);
+      setIsLoading(false);
     };
-  } catch {
-    return null;
-  }
-}
-
-export default async function AnalyticsPage() {
-  const data = await getAnalyticsData();
-  const hasLiveData = Boolean(data);
+    void load();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <div className="space-y-8">
@@ -155,7 +42,13 @@ export default async function AnalyticsPage() {
         </p>
       </div>
 
-      {!hasLiveData ? (
+      {isLoading ? (
+        <Card>
+          <p className="text-sm text-slate-300">Loading analytics...</p>
+        </Card>
+      ) : null}
+
+      {!isLoading && !data ? (
         <Card>
           <p className="text-sm text-slate-300">
             Live analytics are unavailable. Check API connectivity or authentication.
@@ -184,18 +77,6 @@ export default async function AnalyticsPage() {
             <h3 className="mt-2 text-xl font-semibold text-white">Organizations by plan</h3>
           </div>
           <PlanDistributionChart data={data?.planDistribution ?? []} />
-          {data?.planDistribution?.length ? (
-            <div className="grid grid-cols-3 gap-3 text-xs text-slate-400">
-              {data.planDistribution.map((item) => (
-                <div key={item.name}>
-                  <div className="text-sm text-slate-200">{item.value}</div>
-                  <div>{item.name}</div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-slate-400">No plan distribution data yet.</p>
-          )}
         </Card>
       </div>
 

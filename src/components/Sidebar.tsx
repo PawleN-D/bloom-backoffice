@@ -8,6 +8,7 @@ import { hasPermission, type Permission } from "@/lib/rbac";
 const navItems: Array<{ href: string; label: string; permission?: Permission }> = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/organizations", label: "Organizations", permission: "org.view" },
+  { href: "/emails", label: "Communications", permission: "org.view" },
   { href: "/subscriptions", label: "Subscriptions", permission: "subscription.view" },
   { href: "/analytics", label: "Analytics", permission: "analytics.view" },
   { href: "/support", label: "Support", permission: "support.view" },

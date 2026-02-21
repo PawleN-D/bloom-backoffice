@@ -148,7 +148,9 @@ export function toOrganizationSummary(raw: Record<string, unknown>): Organizatio
 }
 
 export async function fetchOrganizations(): Promise<OrganizationSummary[]> {
-  const response = await apiClient.get<OrganizationsResponse>("/api/admin/organizations");
+  const response = await apiClient.get<OrganizationsResponse>(
+    "/api/admin/organizations?includesSuspended=true"
+  );
   const payload = response.data as { data?: unknown } | unknown;
   const raw = (payload as { data?: unknown })?.data ?? payload;
   const data = Array.isArray(raw)
@@ -172,7 +174,7 @@ export async function checkSubdomainAvailability(
   }
 
   const response = await apiClient.get<ApiPayload<unknown>>(
-    `/api/admin/organizations?search=${encodeURIComponent(normalized)}`
+    `/api/admin/organizations?search=${encodeURIComponent(normalized)}&includesSuspended=true`
   );
   const payload = response.data as { data?: unknown };
   const raw = payload?.data ?? response.data;
@@ -199,8 +201,10 @@ export async function checkSubdomainAvailability(
 }
 
 export async function fetchOrganization(id: string): Promise<OrganizationSummary> {
+  // TODO: API endpoint enhancement not yet implemented
+  // Expected: GET /api/hq/organizations/:id?includesSuspended=true
   const response = await apiClient.get<ApiPayload<unknown>>(
-    `/api/admin/organizations/${id}`
+    `/api/admin/organizations/${id}?includesSuspended=true`
   );
   const payload = response.data as { data?: unknown };
   const raw = payload?.data ?? response.data;
@@ -211,7 +215,9 @@ export async function fetchOrganization(id: string): Promise<OrganizationSummary
 }
 
 export async function fetchOrganizationSubscription(id: string): Promise<SubscriptionSummary | null> {
-  const response = await apiClient.get<ApiPayload<unknown>>(`/api/hq/subscriptions/${id}`);
+  const response = await apiClient.get<ApiPayload<unknown>>(
+    `/api/hq/subscriptions/${id}?includesSuspended=true`
+  );
   const payload = response.data as { data?: unknown };
   const raw = payload?.data ?? response.data;
   if (!raw || typeof raw !== "object") {
@@ -234,7 +240,7 @@ export async function fetchOrganizationSubscription(id: string): Promise<Subscri
 
 export async function fetchOrganizationUsers(id: string): Promise<OrganizationUser[]> {
   const response = await apiClient.get<ApiPayload<unknown>>(
-    `/api/admin/organizations/${id}/users`
+    `/api/admin/organizations/${id}/users?includesSuspended=true`
   );
   const payload = response.data as { data?: unknown };
   const raw = payload?.data ?? response.data;
@@ -250,7 +256,9 @@ export async function fetchOrganizationUsers(id: string): Promise<OrganizationUs
     role: normalizeString(user.role ?? user.permission ?? "-"),
     status: normalizeString(user.status ?? user.state ?? "-"),
     isActive: Boolean(user.isActive ?? user.active ?? false),
-    lastLoginAt: null,
+    lastLoginAt: normalizeIsoDate(user.lastLoginAt ?? user.last_login_at ?? user.lastSeenAt),
+    createdAt: normalizeIsoDate(user.createdAt ?? user.created_at),
+    mustResetPw: Boolean(user.mustResetPw ?? user.must_reset_pw ?? false),
   }));
 }
 
@@ -276,7 +284,9 @@ export async function createOrganizationUser(
     role: normalizeString(record.role ?? "-"),
     status: normalizeString(record.status ?? "-"),
     isActive: Boolean(record.isActive ?? record.active ?? false),
-    lastLoginAt: null,
+    lastLoginAt: normalizeIsoDate(record.lastLoginAt ?? record.last_login_at ?? record.lastSeenAt),
+    createdAt: normalizeIsoDate(record.createdAt ?? record.created_at),
+    mustResetPw: Boolean(record.mustResetPw ?? record.must_reset_pw ?? false),
   };
 
   return { user, invitationToken };
@@ -302,7 +312,9 @@ export async function updateOrganizationUserRole(
     role: normalizeString(record.role ?? role),
     status: normalizeString(record.status ?? "-"),
     isActive: Boolean(record.isActive ?? record.active ?? false),
-    lastLoginAt: null,
+    lastLoginAt: normalizeIsoDate(record.lastLoginAt ?? record.last_login_at ?? record.lastSeenAt),
+    createdAt: normalizeIsoDate(record.createdAt ?? record.created_at),
+    mustResetPw: Boolean(record.mustResetPw ?? record.must_reset_pw ?? false),
   };
 }
 
@@ -314,9 +326,15 @@ export async function reactivateOrganizationUser(id: string, userId: string) {
   await apiClient.post(`/api/admin/organizations/${id}/users/${userId}/reactivate`);
 }
 
+export async function sendUserResetLink(userId: string) {
+  // TODO: API endpoint not yet implemented
+  // Expected: POST /api/hq/users/:userId/send-reset-link
+  await apiClient.post(`/api/hq/users/${userId}/send-reset-link`);
+}
+
 export async function fetchOrganizationActivity(id: string): Promise<OrganizationActivity[]> {
   const response = await apiClient.get<ApiPayload<unknown[]>>(
-    `/api/hq/security-logs?organizationId=${id}`
+    `/api/hq/security-logs?organizationId=${id}&includesSuspended=true`
   );
   const payload = response.data as { data?: unknown[] };
   const raw = payload?.data ?? response.data;
@@ -332,7 +350,7 @@ export async function fetchOrganizationActivity(id: string): Promise<Organizatio
 
 export async function fetchOrganizationTickets(id: string): Promise<SupportTicketSummary[]> {
   const response = await apiClient.get<ApiPayload<unknown[]>>(
-    `/api/hq/support/tickets?organizationId=${id}`
+    `/api/hq/support/tickets?organizationId=${id}&includesSuspended=true`
   );
   const payload = response.data as { data?: unknown[] };
   const raw = payload?.data ?? response.data;
