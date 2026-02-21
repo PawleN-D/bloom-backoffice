@@ -1,5 +1,7 @@
 import { SubscriptionDetailContainer } from "@/components/features/subscriptions/SubscriptionDetailContainer";
 
+export const runtime = "edge";
+
 type SubscriptionDetailPageProps = {
   params: Promise<{ id: string }>;
 };

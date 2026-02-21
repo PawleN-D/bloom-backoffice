@@ -1,5 +1,7 @@
 import { OrganizationDetailContainer } from "@/components/features/organizations/OrganizationDetailContainer";
 
+export const runtime = "edge";
+
 type OrganizationDetailPageProps = {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ tab?: string }>;
