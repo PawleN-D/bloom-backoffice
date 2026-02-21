@@ -1,5 +1,7 @@
 import { OrgUserManagerContainer } from "@/components/features/organizations/OrgUserManagerContainer";
 
+export const runtime = "edge";
+
 type OrganizationUsersPageProps = {
   params: Promise<{ id: string }>;
 };

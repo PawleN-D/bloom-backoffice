@@ -15,22 +15,45 @@ export async function POST(request: Request) {
   }
 
   const requestPayload = await request.json();
+  const backendLoginUrl = new URL("/api/auth/login", SERVER_API_BASE_URL).toString();
+  const requestUrl = new URL(request.url);
+
+  if (new URL(backendLoginUrl).origin === requestUrl.origin) {
+    return NextResponse.json(
+      {
+        message:
+          "Auth API base URL points to this app. Set BACKEND_API_BASE_URL to your backend service URL.",
+      },
+      { status: 500 }
+    );
+  }
+
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => controller.abort(), 15000);
+
   let response: Response;
   try {
-    response = await fetch(`${SERVER_API_BASE_URL}/api/auth/login`, {
+    response = await fetch(backendLoginUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(requestPayload),
       cache: "no-store",
+      signal: controller.signal,
     });
   } catch (error) {
+    const message =
+      error instanceof Error && error.name === "AbortError"
+        ? `Auth API request timed out at ${SERVER_API_BASE_URL}.`
+        : `Unable to reach auth API at ${SERVER_API_BASE_URL}. ${
+            error instanceof Error ? error.message : "Unknown network error"
+          }`;
+
     const detail = error instanceof Error ? error.message : "Unknown network error";
-    return NextResponse.json(
-      { message: `Unable to reach auth API at ${SERVER_API_BASE_URL}. ${detail}` },
-      { status: 502 }
-    );
+    return NextResponse.json({ message, detail }, { status: 502 });
+  } finally {
+    clearTimeout(timeoutHandle);
   }
 
   if (!response.ok) {
